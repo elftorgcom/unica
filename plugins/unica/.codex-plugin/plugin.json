@@ -1,7 +1,7 @@
 {
   "name": "unica",
-  "version": "0.2.0",
-  "description": "Pinned 1C:Enterprise development tooling for Codex.",
+  "version": "0.3.0",
+  "description": "Practical 1C:Enterprise development workflows for Codex.",
   "author": {
     "name": "Ingvar Consulting, LLC",
     "url": "https://ingvar.pro"
@@ -13,6 +13,12 @@
     "1c",
     "1c-enterprise",
     "bsl",
+    "metadata",
+    "epf",
+    "erf",
+    "cfe",
+    "forms",
+    "database",
     "mcp",
     "codex",
     "v8-runner",
@@ -23,8 +29,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Unica",
-    "shortDescription": "Pinned 1C developer tools and MCP servers for Codex",
-    "longDescription": "Unica packages pinned macOS arm64 tools for 1C:Enterprise development: bsl-analyzer, v8-runner, rlm-tools-bsl, and the public v8std MCP endpoint. Tool binaries are launched through checksum-verifying wrappers so a plugin version maps to a known toolset.",
+    "shortDescription": "1C developer workflows for Codex",
+    "longDescription": "Unica teaches Codex practical 1C:Enterprise development operations: creating and editing metadata, forms, roles, SKD and MXL layouts, building EPF/ERF artifacts, creating and updating infobases, publishing web clients, and analyzing BSL code. Pinned bundled tools and MCP servers are kept as internal infrastructure behind checksum-verifying launchers.",
     "developerName": "Ingvar Consulting, LLC",
     "category": "Coding",
     "capabilities": [
@@ -36,10 +42,10 @@
     "privacyPolicyURL": "https://ingvar.pro/privacy",
     "termsOfServiceURL": "https://ingvar.pro/terms",
     "defaultPrompt": [
-      "Set up 1C development tools for this repo",
-      "Analyze this 1C project with bsl-analyzer",
-      "Explore this large 1C codebase with rlm-tools-bsl",
-      "Run v8-runner checks for this 1C project"
+      "Создай внешнюю обработку 1С и собери EPF",
+      "Добавь объект метаданных и форму в конфигурацию 1С",
+      "Обнови информационную базу 1С из XML-исходников",
+      "Найди код в 1С-проекте и проверь модуль на ошибки"
     ],
     "brandColor": "#2563EB",
     "composerIcon": "./assets/unica-icon.svg",
