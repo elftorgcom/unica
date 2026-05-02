@@ -11,7 +11,7 @@ SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "install-unica.sh"
 
 def script_command(*args: str) -> list[str]:
     if os.name == "nt":
-        return ["bash", str(SCRIPT), *args]
+        return ["bash", str(SCRIPT).replace("\\", "/"), *args]
     return [str(SCRIPT), *args]
 
 
@@ -27,7 +27,7 @@ class InstallUnicaScriptTests(unittest.TestCase):
 
         self.assertEqual(
             result.stdout.strip(),
-            "https://github.com/ingvarvilkman/unica/releases/latest/download/"
+            "https://github.com/IngvarConsulting/unica/releases/latest/download/"
             "unica-codex-marketplace-darwin-arm64.tar.gz",
         )
 
@@ -42,7 +42,7 @@ class InstallUnicaScriptTests(unittest.TestCase):
 
         self.assertEqual(
             result.stdout.strip(),
-            "https://github.com/ingvarvilkman/unica/releases/download/v0.3.3/"
+            "https://github.com/IngvarConsulting/unica/releases/download/v0.3.3/"
             "unica-codex-marketplace-linux-x64.tar.gz",
         )
 

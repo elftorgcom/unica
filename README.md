@@ -26,13 +26,13 @@ Unica - это плагин для Codex, который помогает раб
 платформу, скачивает нужный пакет Unica и устанавливает его в Codex:
 
 ```sh
-curl -fsSL https://github.com/ingvarvilkman/unica/releases/latest/download/install-unica.sh | sh
+curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh
 ```
 
 Для установки конкретного релиза:
 
 ```sh
-curl -fsSL https://github.com/ingvarvilkman/unica/releases/latest/download/install-unica.sh | sh -s -- --version v0.3.5
+curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh -s -- --version v0.3.6
 ```
 
 Release assets собираются отдельно под платформы:
@@ -57,7 +57,7 @@ codex debug prompt-input 'test'
 Этот режим нужен, если вы меняете сам плагин:
 
 ```sh
-git clone https://github.com/ingvarvilkman/unica.git
+git clone https://github.com/IngvarConsulting/unica.git
 cd unica
 scripts/dev/install-local-unica.sh
 ```
