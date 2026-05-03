@@ -253,6 +253,39 @@ def build_python_entrypoint(
     return dest
 
 
+def build_cargo_workspace_tool(
+    tool: dict,
+    repo_root: Path,
+    target_dir: Path,
+    out_dir: Path,
+    exe: str,
+) -> Path:
+    package = tool["cargoPackage"]
+    binary_name = tool.get("cargoBin", tool["binaryName"])
+    run(
+        [
+            "cargo",
+            "build",
+            "--release",
+            "--package",
+            package,
+            "--bin",
+            binary_name,
+            "--target-dir",
+            str(target_dir),
+        ],
+        cwd=repo_root,
+    )
+
+    produced = target_dir / "release" / f"{binary_name}{exe}"
+    if not produced.exists():
+        raise SystemExit(f"cargo build output not found: {produced}")
+
+    dest = out_dir / f"{tool['binaryName']}{exe}"
+    shutil.copy2(produced, dest)
+    return dest
+
+
 def tool_entry(
     *,
     target: str,
@@ -289,6 +322,7 @@ def main() -> None:
     parser.add_argument("--target", required=True)
     parser.add_argument("--lock-file", type=Path, default=Path("plugins/unica/third-party/tools.lock.json"))
     parser.add_argument("--rlm-source", type=Path)
+    parser.add_argument("--repo-root", type=Path, default=Path("."))
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--work-dir", type=Path, default=Path(".build/unica-tools"))
     args = parser.parse_args()
@@ -312,19 +346,21 @@ def main() -> None:
     source_cache: dict[tuple[str, str, str], Path] = {}
 
     for tool in lock["tools"]:
-        asset = tool["assets"].get(args.target)
-        if not asset:
-            raise SystemExit(f"{tool['name']} has no asset for target {args.target}")
-
         strategy = tool["assetStrategy"]
         dest = target_bin_dir / f"{tool['binaryName']}{exe}"
 
         if strategy == "direct-release-asset":
+            asset = tool["assets"].get(args.target)
+            if not asset:
+                raise SystemExit(f"{tool['name']} has no asset for target {args.target}")
             url = f"{tool['repository']}/releases/download/{tool['sourceTag']}/{asset['assetName']}"
             downloaded = downloads_dir / asset["assetName"]
             download(url, downloaded)
             shutil.copy2(downloaded, dest)
         elif strategy == "archive-release-asset":
+            asset = tool["assets"].get(args.target)
+            if not asset:
+                raise SystemExit(f"{tool['name']} has no asset for target {args.target}")
             url = f"{tool['repository']}/releases/download/{tool['sourceTag']}/{asset['assetName']}"
             downloaded = downloads_dir / asset["assetName"]
             download(url, downloaded)
@@ -343,6 +379,14 @@ def main() -> None:
                 target_bin_dir,
                 exe,
                 venv_python,
+            )
+        elif strategy == "cargo-workspace":
+            dest = build_cargo_workspace_tool(
+                tool,
+                args.repo_root.resolve(),
+                args.work_dir / args.target / "cargo-target",
+                target_bin_dir,
+                exe,
             )
         else:
             raise SystemExit(f"unsupported assetStrategy for {tool['name']}: {strategy}")

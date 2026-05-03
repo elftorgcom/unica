@@ -10,6 +10,13 @@ allowed-tools:
 
 # /form-info — Компактная сводка формы
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.form.info`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Читает Form.xml и выводит дерево элементов, реквизиты с типами, команды, события. Заменяет чтение тысяч строк XML.
 
 ## Команда

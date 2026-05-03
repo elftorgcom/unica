@@ -78,7 +78,7 @@ scripts/dev/install-local-unica.sh --marketplace-name unica-dev
 | Operation skills and PowerShell scripts | Primary path | Available when PowerShell is installed | The source skills are Windows-first because 1C Designer automation is Windows-first. |
 | Python script ports | Available with Python | Available with `python3` | Used for XML/metadata operations where ports exist. |
 | Bundled binaries | Built by GitHub Actions into `bin/win-x64/` | Built by GitHub Actions into `bin/darwin-arm64/` | Linux x64 is built into `bin/linux-x64/`; each release artifact carries one target-specific manifest. Binaries are ignored in source control. |
-| MCP local tools | Direct PowerShell launcher is supported for packaged Windows binaries | Shell-first stdio MCP entries are supported on macOS/Linux | Remote `unica-v8std` works independently of local binaries. |
+| MCP local tools | Direct PowerShell launcher is supported for packaged Windows binaries | Shell-first stdio MCP orchestrator is supported on macOS/Linux | External standards data is reached through the internal standards adapter. |
 | 1C platform operations | Requires local 1C platform | Requires local 1C platform or compatible tooling | Skills resolve project/database context from `v8project.yaml` when present. |
 
 ## Bundled Tools
@@ -91,13 +91,14 @@ versions in CI scripts or docs.
 - `v8-runner`
 - `rlm-tools-bsl`
 - `rlm-bsl-index`
+- `unica`
 - remote v8std MCP endpoint: `https://ai.v8std.ru/mcp`
 
 Every bundled binary launch goes through a wrapper:
 
 - `scripts/run-tool.sh` for macOS/Linux shell environments;
 - `scripts/run-tool.ps1` for PowerShell environments;
-- per-tool shell wrappers used by current stdio MCP entries.
+- per-tool shell wrappers used by the `unica` orchestrator as internal adapters.
 
 Wrappers read `third-party/manifest.json`, check the host target, verify SHA-256, and then execute the pinned binary. This prevents Codex from accidentally using a global tool of another version.
 
@@ -123,17 +124,13 @@ Use the generated marketplace archive as the candidate package for the official 
 
 Unica is licensed under `LGPL-3.0-or-later`. See `LICENSE`.
 
-## MCP Servers
+## MCP Server
 
-`.mcp.json` declares internal MCP endpoints used by operation workflows:
+`.mcp.json` declares exactly one public MCP server:
 
-- `unica-bsl-reference`
-- `unica-bsl-workspace`
-- `unica-v8-runner`
-- `unica-rlm-tools-bsl`
-- `unica-v8std`
+- `unica`
 
-Skills should choose these by task: code search and diagnostics use BSL/RLM tools, build and database workflows use v8-runner/platform tooling, and standards/APK questions use v8std plus reference material.
+`unica` owns workspace discovery, cache coordination, and adapter orchestration. Build/runtime tooling, code analysis, standards lookup, and XML/JSON DSL fallback scripts are private implementation details behind this one MCP contract.
 
 ## Verification
 
@@ -157,6 +154,7 @@ plugins/unica/scripts/run-bsl-analyzer.sh --version
 plugins/unica/scripts/run-v8-runner.sh config init --help
 plugins/unica/scripts/run-rlm-tools-bsl.sh --version
 plugins/unica/scripts/run-rlm-bsl-index.sh --version
+plugins/unica/scripts/run-unica.sh --help
 ```
 
 ## Updating Pinned Tools

@@ -118,6 +118,29 @@
           "assetName": "rlm-bsl-index-win-x64.exe"
         }
       }
+    },
+    {
+      "name": "unica",
+      "version": "0.3.11",
+      "repository": "https://github.com/IngvarConsulting/unica",
+      "sourceTag": "workspace",
+      "sourceCommit": "workspace",
+      "license": "LGPL-3.0-or-later",
+      "assetStrategy": "cargo-workspace",
+      "binaryName": "unica",
+      "cargoPackage": "unica-coder",
+      "cargoBin": "unica",
+      "assets": {
+        "darwin-arm64": {
+          "assetName": "unica"
+        },
+        "linux-x64": {
+          "assetName": "unica"
+        },
+        "win-x64": {
+          "assetName": "unica.exe"
+        }
+      }
     }
   ]
 }

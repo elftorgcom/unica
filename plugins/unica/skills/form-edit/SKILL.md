@@ -11,6 +11,13 @@ allowed-tools:
 
 # /form-edit — Редактирование формы
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.form.edit`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Добавляет элементы, реквизиты и/или команды в существующий Form.xml. Автоматически выделяет ID из правильного пула, генерирует companion-элементы (ContextMenu, ExtendedTooltip, и др.) и обработчики событий.
 
 ## Использование

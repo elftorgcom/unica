@@ -43,6 +43,19 @@ class PackageUnicaPluginTests(unittest.TestCase):
             ],
         }
 
+    def test_source_mcp_declares_single_unica_orchestrator(self) -> None:
+        repo_root = Path(__file__).resolve().parents[2]
+        mcp = json.loads((repo_root / "plugins" / "unica" / ".mcp.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(sorted(mcp["mcpServers"]), ["unica"])
+
+        server = mcp["mcpServers"]["unica"]
+
+        self.assertEqual(server["command"], "bash")
+        self.assertIn("run-unica.sh", " ".join(server["args"]))
+        self.assertIn("orchestrator", server["note"])
+        self.assertNotIn("unica-coder", json.dumps(server))
+
     def write_bundle(self, root: Path, target: str, module) -> Path:
         bundle = root / f"unica-tools-{target}"
         bin_dir = bundle / "bin" / target

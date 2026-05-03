@@ -161,9 +161,9 @@ def write_manifest(plugin_dir: Path, grouped_tools: dict[str, dict], lock_file: 
         "sourceLock": "third-party/tools.lock.json",
         "sourceLockSha256": sha256(lock_path),
         "tools": [grouped_tools[name] for name in sorted(grouped_tools)],
-        "remoteMcpServers": [
+        "internalAdapters": [
             {
-                "name": "unica-v8std",
+                "name": "v8std",
                 "url": "https://ai.v8std.ru/mcp",
                 "protocol": "streamable-http",
             }

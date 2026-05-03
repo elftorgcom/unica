@@ -26,7 +26,8 @@ that target. The checked-in manifest is only a source-tree placeholder.
 - `v8-runner`: 1C build, syntax, test, and platform-oriented automation.
 - `rlm-tools-bsl`: token-efficient exploration of large 1C BSL repositories.
 - `rlm-bsl-index`: repository indexing for `rlm-tools-bsl`.
-- `unica-v8std`: remote streamable HTTP MCP endpoint for standards, APK codes, and v8-code-style context.
+- `unica`: Rust stdio MCP orchestrator and the only public MCP server.
+- remote v8std endpoint: standards, APK codes, and v8-code-style context through an internal adapter.
 
 Never replace a binary manually in the repository. Update
 `third-party/tools.lock.json`, bump the plugin version, and let the release
@@ -40,9 +41,9 @@ different version.
 
 - `scripts/run-tool.sh <tool-name> [args...]` is the macOS/Linux launcher.
 - `scripts/run-tool.ps1 <tool-name> [args...]` is the PowerShell launcher.
-- Per-tool shell wrappers call `run-tool.sh` for current stdio MCP entries.
+- Per-tool shell wrappers call `run-tool.sh` for internal adapters.
   The packaged MCP runtime is shell-first on macOS/Linux; Windows can run
-  bundled tools through PowerShell wrappers, but stdio MCP entries currently
+  bundled tools through PowerShell wrappers, but stdio MCP orchestration currently
   require a shell-compatible launcher.
 
 Launcher responsibilities:
@@ -89,19 +90,14 @@ artifacts:
 
 ## MCP Contract
 
-The plugin declares MCP servers in `.mcp.json`:
+The plugin declares exactly one public MCP server in `.mcp.json`:
 
-- `unica-bsl-reference`
-- `unica-bsl-workspace`
-- `unica-v8-runner`
-- `unica-rlm-tools-bsl`
-- `unica-v8std`
+- `unica`
 
-Operation skills should choose these MCP servers by task:
-
-- code search and large-repository exploration: `unica-rlm-tools-bsl` first, `unica-bsl-workspace` for diagnostics and metadata-aware checks;
-- build, syntax, tests, dump/load, and infobase operations: `unica-v8-runner` and local 1C platform scripts;
-- standards, APK diagnostics, BSLLS/v8-code-style context: `unica-v8std` and references under `references/ai-rules-1c/`.
+Operation skills should route through `unica`. Build/runtime tools, code
+analysis, standards lookup, and XML/JSON DSL scripts are internal adapters
+owned by the orchestrator, so cache refresh and source-set invalidation happen
+inside one process instead of through LLM-visible coordination.
 
 ## Reference Material
 
@@ -123,7 +119,7 @@ python3 -m json.tool plugins/unica/third-party/tools.lock.json >/dev/null
 python3 -m json.tool plugins/unica/third-party/manifest.json >/dev/null
 bash -n plugins/unica/scripts/*.sh
 python3 -m py_compile scripts/ci/*.py
-rg '\\.claude/skills|unica-(setup|bsl|v8-runner|v8std|rlm-tools-bsl)' plugins/unica/skills
+rg '\\.claude/skills|unica-(bsl|v8-runner|v8std|rlm-tools-bsl|coder)' plugins/unica/skills
 codex debug prompt-input 'test'
 ```
 

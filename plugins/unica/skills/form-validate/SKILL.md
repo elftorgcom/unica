@@ -10,6 +10,13 @@ allowed-tools:
 
 # /form-validate — валидация управляемой формы 1С
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.form.validate`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Проверяет Form.xml на структурные ошибки: уникальность ID, наличие companion-элементов, корректность ссылок DataPath и команд.
 
 ## Параметры

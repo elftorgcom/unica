@@ -12,7 +12,7 @@ allowed-tools:
 
 # /workspace-init — первый workspace проекта
 
-Цель: из пустого репозитория получить рабочий `v8project.yaml`, каталог исходников и проверенный путь для `v8-runner`, `unica-v8-runner` и `unica-bsl-workspace`.
+Цель: из пустого репозитория получить рабочий `v8project.yaml`, каталог исходников и проверенный путь для MCP `unica`.
 
 ## Жесткие стопы
 
@@ -72,7 +72,7 @@ test -f v8project.yaml
 test -d src
 ```
 
-После этого локальные MCP `unica-v8-runner` и `unica-bsl-workspace` могут стартовать из корня проекта.
+После этого MCP `unica` может стартовать из корня проекта и сам синхронизировать workspace/cache state.
 
 ## Правила автоматизации
 

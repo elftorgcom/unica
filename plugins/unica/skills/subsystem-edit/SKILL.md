@@ -11,6 +11,13 @@ allowed-tools:
 
 # /subsystem-edit — редактирование подсистемы 1С
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.subsystem.edit`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Точечное редактирование XML подсистемы: состав, дочерние подсистемы, свойства.
 
 ## Параметры и команда

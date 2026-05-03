@@ -189,6 +189,7 @@ rm -rf "$PACKAGE_OUT"
 "$PYTHON_BIN" -m json.tool "$MARKETPLACE_DIR/plugins/unica/third-party/manifest.json" >/dev/null
 
 "$MARKETPLACE_DIR/plugins/unica/scripts/run-v8-runner.sh" config init --help >/dev/null
+"$MARKETPLACE_DIR/plugins/unica/scripts/run-unica.sh" --help >/dev/null
 PLUGIN_VERSION="$("$PYTHON_BIN" -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["version"])' "$MARKETPLACE_DIR/plugins/unica/.codex-plugin/plugin.json")"
 CODEX_PLUGIN_CACHE_VERSION_DIR="$CODEX_PLUGIN_CACHE_DIR/$PLUGIN_VERSION"
 

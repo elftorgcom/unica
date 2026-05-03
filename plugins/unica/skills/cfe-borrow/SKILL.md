@@ -10,6 +10,13 @@ allowed-tools:
 
 # /cfe-borrow — Заимствование объектов из конфигурации
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.cfe.borrow`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Заимствует объекты из основной конфигурации в расширение. Создаёт XML-файлы с `ObjectBelonging=Adopted` и `ExtendedConfigurationObject`, добавляет запись в ChildObjects расширения.
 
 ## Предусловие

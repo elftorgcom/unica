@@ -1,0 +1,76 @@
+use std::collections::hash_map::DefaultHasher;
+use std::env;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
+use std::time::UNIX_EPOCH;
+
+#[derive(Debug, Clone)]
+pub struct WorkspaceContext {
+    pub cwd: PathBuf,
+    pub workspace_root: PathBuf,
+    pub cache_root: PathBuf,
+    pub workspace_epoch: u64,
+}
+
+impl WorkspaceContext {
+    pub fn discover(cwd: PathBuf) -> Result<Self, String> {
+        let cwd = if cwd.is_absolute() {
+            cwd
+        } else {
+            env::current_dir()
+                .map_err(|err| format!("failed to read current directory: {err}"))?
+                .join(cwd)
+        };
+        let workspace_root = find_workspace_root(&cwd).unwrap_or_else(|| cwd.clone());
+        let cache_root = env::var("UNICA_CACHE_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| workspace_root.join(".build").join("unica"));
+        let workspace_epoch = workspace_fingerprint(&workspace_root);
+        Ok(Self {
+            cwd,
+            workspace_root,
+            cache_root,
+            workspace_epoch,
+        })
+    }
+}
+
+fn find_workspace_root(cwd: &Path) -> Option<PathBuf> {
+    for base in cwd.ancestors() {
+        if base.join("v8project.yaml").is_file() || base.join(".git").exists() {
+            return Some(base.to_path_buf());
+        }
+    }
+    None
+}
+
+fn workspace_fingerprint(root: &Path) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    root.display().to_string().hash(&mut hasher);
+    for rel in [
+        "v8project.yaml",
+        "Configuration.xml",
+        "src/Configuration.xml",
+        ".git/HEAD",
+    ] {
+        hash_path(&mut hasher, root, rel);
+    }
+    hasher.finish()
+}
+
+fn hash_path(hasher: &mut DefaultHasher, root: &Path, rel: &str) {
+    rel.hash(hasher);
+    let path = root.join(rel);
+    let Ok(metadata) = path.metadata() else {
+        0_u8.hash(hasher);
+        return;
+    };
+    metadata.len().hash(hasher);
+    if let Ok(modified) = metadata.modified() {
+        let secs = modified
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs())
+            .unwrap_or_default();
+        secs.hash(hasher);
+    }
+}

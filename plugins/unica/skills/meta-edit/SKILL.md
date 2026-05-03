@@ -11,6 +11,13 @@ allowed-tools:
 
 # /meta-edit — точечное редактирование метаданных 1С
 
+## MCP routing
+
+- Preferred path: use MCP `unica` tool `unica.meta.edit`; `unica` owns XML/JSON DSL work and refreshes related workspace caches after mutations.
+- Do not call internal MCP/CLI adapters directly. They are hidden behind `unica` and synchronized by the orchestrator.
+- Current Python/PowerShell scripts are fallback implementation details until Rust parity is complete.
+- For mutating operations, pass `dryRun: false` only when the user explicitly requested the change; otherwise keep the default dry run.
+
 Атомарные операции модификации существующих XML объектов метаданных.
 
 ## Команда

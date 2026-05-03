@@ -1,0 +1,15 @@
+# 9. Архитектурные решения
+
+Accepted decisions live in `spec/decisions`.
+
+Current decisions:
+
+- ADR-0001: one public MCP `unica`;
+- ADR-0002: transport-neutral application layer;
+- ADR-0003: orchestrator-owned cache and workspace state;
+- ADR-0004: skill-local operation files as migration debt;
+- ADR-0005: skills route only through `unica`.
+
+If a future change adds, removes, or renames a public MCP tool, changes cache
+ownership, or exposes an internal engine directly, it must update or supersede
+the relevant ADR.

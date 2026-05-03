@@ -66,6 +66,56 @@ class BuildPythonEntrypointTests(unittest.TestCase):
             self.assertEqual(args[args.index("--hidden-import") + 1], "rlm_tools_bsl.server")
             self.assertFalse(str(args[-1]).endswith(".exe"))
 
+    def test_cargo_workspace_tool_builds_from_repo_root(self) -> None:
+        module = load_build_module()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            repo_root.mkdir()
+            out_dir = root / "out"
+            out_dir.mkdir()
+            target_dir = root / "cargo-target"
+            produced = target_dir / "release" / "unica"
+            produced.parent.mkdir(parents=True)
+            produced.write_bytes(b"rust mcp")
+            calls = []
+
+            def fake_run(args, *, cwd=None):
+                calls.append((args, cwd))
+
+            with patch.object(module, "run", side_effect=fake_run):
+                dest = module.build_cargo_workspace_tool(
+                    {
+                        "name": "unica",
+                        "binaryName": "unica",
+                        "cargoPackage": "unica-coder",
+                        "cargoBin": "unica",
+                    },
+                    repo_root,
+                    target_dir,
+                    out_dir,
+                    "",
+                )
+
+            self.assertEqual(dest, out_dir / "unica")
+            self.assertEqual(dest.read_bytes(), b"rust mcp")
+            self.assertEqual(calls[0][1], repo_root)
+            self.assertEqual(
+                calls[0][0],
+                [
+                    "cargo",
+                    "build",
+                    "--release",
+                    "--package",
+                    "unica-coder",
+                    "--bin",
+                    "unica",
+                    "--target-dir",
+                    str(target_dir),
+                ],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,18 @@
+[package]
+name = "unica-coder"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "unica"
+path = "src/main.rs"
+
+[lib]
+name = "unica_coder"
+path = "src/lib.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
