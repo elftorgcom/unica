@@ -373,6 +373,17 @@ class UnicaSkillRoutingTests(unittest.TestCase):
                 for name in forbidden:
                     self.assertNotIn(name, text)
 
+    def test_skills_and_references_do_not_instruct_direct_rlm_mcp_calls(self) -> None:
+        forbidden = ["rlm_index", "rlm_start", "rlm_execute", "rlm_end"]
+        docs = list(self.skill_root().glob("**/*.md")) + list(
+            self.reference_root().glob("**/*.md")
+        )
+        for doc in docs:
+            text = doc.read_text(encoding="utf-8")
+            for token in forbidden:
+                with self.subTest(path=doc.relative_to(self.repo_root()), token=token):
+                    self.assertNotIn(token, text)
+
     def test_v8_runner_replaces_runtime_and_external_skills_with_single_mcp_skill(self) -> None:
         skill_dir = self.skill_root() / "v8-runner"
         self.assertTrue((skill_dir / "SKILL.md").is_file())

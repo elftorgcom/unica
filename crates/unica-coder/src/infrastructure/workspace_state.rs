@@ -1,6 +1,7 @@
 use crate::domain::cache::{path_for_report, CacheAccess, CacheImpact, CacheReport};
 use crate::domain::events::DomainEvent;
 use crate::domain::workspace::WorkspaceContext;
+use crate::infrastructure::workspace_index::bsl_index_is_ready;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fs;
@@ -84,6 +85,20 @@ impl WorkspaceStateRepository {
 
         if events.is_empty() && !dry_run {
             for name in cache_access.reads {
+                if *name == "bsl_index" {
+                    state.caches.insert(
+                        (*name).to_string(),
+                        CacheEntry {
+                            status: if bsl_index_is_ready(context) {
+                                CacheStatus::Fresh
+                            } else {
+                                CacheStatus::Stale
+                            },
+                            epoch: context.workspace_epoch,
+                        },
+                    );
+                    continue;
+                }
                 let is_stale = state
                     .caches
                     .get(*name)
@@ -190,7 +205,7 @@ fn sorted(values: std::collections::BTreeSet<String>) -> Vec<String> {
 }
 
 fn is_lazy_cache(name: &str) -> bool {
-    matches!(name, "bsl_index" | "bsl_diagnostics")
+    matches!(name, "bsl_diagnostics")
 }
 
 #[cfg(test)]
@@ -200,7 +215,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn stale_heavy_index_is_rebuilt_lazily_when_read() {
+    fn bsl_index_read_reflects_real_index_status_instead_of_lazy_rebuild() {
         let root = temp_root("unica-cache-lazy");
         fs::create_dir_all(&root).unwrap();
         let context = WorkspaceContext {
@@ -224,7 +239,7 @@ mod tests {
             .unwrap();
         assert!(invalidation.stale.contains(&"bsl_index".to_string()));
 
-        let rebuilt = repo
+        let reported = repo
             .report(
                 &context,
                 &[],
@@ -235,12 +250,8 @@ mod tests {
                 },
             )
             .unwrap();
-        assert_eq!(rebuilt.lazy_rebuilt, vec!["bsl_index".to_string()]);
-        assert!(context
-            .cache_root
-            .join("caches")
-            .join("bsl_index.json")
-            .is_file());
+        assert!(reported.lazy_rebuilt.is_empty());
+        assert!(reported.stale.contains(&"bsl_index".to_string()));
 
         let _ = fs::remove_dir_all(root);
     }

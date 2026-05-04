@@ -1,9 +1,12 @@
 use crate::domain::cache::{CacheAccess, CacheReport};
 use crate::domain::events::{DomainEvent, DomainEventKind};
 use crate::domain::workspace::WorkspaceContext;
-use crate::infrastructure::internal_adapters::{CliAdapter, RuntimeAdapter, StandardsAdapter};
+use crate::infrastructure::internal_adapters::{
+    CliAdapter, CodeSearchAdapter, RuntimeAdapter, StandardsAdapter,
+};
 use crate::infrastructure::legacy_scripts::LegacyScriptAdapter;
 use crate::infrastructure::native_operations::NativeOperationAdapter;
+use crate::infrastructure::workspace_index::WorkspaceIndexService;
 use crate::infrastructure::workspace_state::WorkspaceStateRepository;
 use crate::infrastructure::AdapterOutcome;
 use serde::Serialize;
@@ -240,8 +243,9 @@ fn call_tool(spec: ToolSpec, args: &Map<String, Value>) -> Result<OperationResul
     let context = WorkspaceContext::discover(cwd)?;
     tool_contracts::validate_workspace_paths(spec, args, dry_run, &context)?;
     let state_repo = WorkspaceStateRepository::new(&context);
+    let index_report = WorkspaceIndexService::new().start_for_workspace(&context, args, dry_run);
 
-    let outcome = match spec.handler {
+    let mut outcome = match spec.handler {
         ToolHandler::LegacyScript { skill, script, .. } => LegacyScriptAdapter::invoke(
             skill,
             script,
@@ -269,6 +273,9 @@ fn call_tool(spec: ToolSpec, args: &Map<String, Value>) -> Result<OperationResul
         ToolHandler::RuntimeAdapter => {
             RuntimeAdapter::new().invoke(spec.name, args, &context, dry_run, spec.mutating)?
         }
+        ToolHandler::CodeAdapter { command } if command == ["search"] => {
+            CodeSearchAdapter::new().invoke(spec.name, args, &context, dry_run)?
+        }
         ToolHandler::CodeAdapter { command } => CliAdapter::new(
             "run-bsl-analyzer.sh",
             command,
@@ -277,6 +284,7 @@ fn call_tool(spec: ToolSpec, args: &Map<String, Value>) -> Result<OperationResul
         .invoke(spec.name, args, &context, dry_run, spec.mutating)?,
         ToolHandler::StandardsAdapter { operation } => StandardsAdapter::invoke(operation, args),
     };
+    outcome.warnings.extend(index_report.warnings);
 
     let events = if should_emit_events(spec, dry_run, &outcome) {
         domain_events(spec, args)

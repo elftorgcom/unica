@@ -1,6 +1,10 @@
 use crate::domain::workspace::WorkspaceContext;
 use crate::infrastructure::legacy_scripts::{find_plugin_root, value_to_cli_string};
+use crate::infrastructure::workspace_index::{
+    IndexReadiness, IndexRunner, WorkspaceIndexService, SYSTEM_INDEX_RUNNER,
+};
 use crate::infrastructure::AdapterOutcome;
+use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
 use std::env;
 use std::path::PathBuf;
@@ -43,6 +47,11 @@ pub struct CliAdapter<'a> {
 
 pub struct RuntimeAdapter<'a> {
     runner: &'a dyn ProcessRunner,
+}
+
+pub struct CodeSearchAdapter<'a> {
+    analyzer_runner: &'a dyn ProcessRunner,
+    index_runner: &'a dyn IndexRunner,
 }
 
 impl<'a> CliAdapter<'a> {
@@ -294,6 +303,153 @@ impl<'a> RuntimeAdapter<'a> {
 impl<'a> Default for RuntimeAdapter<'a> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<'a> CodeSearchAdapter<'a> {
+    pub fn new() -> Self {
+        Self {
+            analyzer_runner: &SYSTEM_PROCESS_RUNNER,
+            index_runner: &SYSTEM_INDEX_RUNNER,
+        }
+    }
+
+    pub fn with_runners(
+        analyzer_runner: &'a dyn ProcessRunner,
+        index_runner: &'a dyn IndexRunner,
+    ) -> Self {
+        Self {
+            analyzer_runner,
+            index_runner,
+        }
+    }
+
+    pub fn invoke(
+        &self,
+        tool_name: &str,
+        args: &Map<String, Value>,
+        context: &WorkspaceContext,
+        dry_run: bool,
+    ) -> Result<AdapterOutcome, String> {
+        let mut analyzer = CliAdapter::with_runner(
+            "run-bsl-analyzer.sh",
+            &["search"],
+            "code analysis",
+            self.analyzer_runner,
+        )
+        .invoke(tool_name, args, context, dry_run, false)?;
+
+        if dry_run {
+            return Ok(analyzer);
+        }
+
+        let analyzer_stdout = analyzer.stdout.take().unwrap_or_default();
+        let analyzer_stderr = analyzer.stderr.take();
+        let mut stdout = format_section("bsl-analyzer", &analyzer_stdout);
+
+        match WorkspaceIndexService::with_runner(self.index_runner).ready_index(context, args) {
+            IndexReadiness::Ready { db_path } => match search_rlm_index(&db_path, args) {
+                Ok(Some(rlm_stdout)) => {
+                    stdout.push_str("\n\n");
+                    stdout.push_str(&format_section("rlm", &rlm_stdout));
+                }
+                Ok(None) => {}
+                Err(error) => analyzer
+                    .warnings
+                    .push(format!("rlm search failed: {error}")),
+            },
+            IndexReadiness::Building => analyzer.warnings.push("rlm index building".to_string()),
+            IndexReadiness::Missing => analyzer
+                .warnings
+                .push("rlm index unavailable: index is missing".to_string()),
+            IndexReadiness::Stale => analyzer.warnings.push("rlm index building".to_string()),
+            IndexReadiness::Failed(error) => analyzer
+                .warnings
+                .push(format!("rlm index unavailable: {error}")),
+            IndexReadiness::Unavailable(error) => analyzer
+                .warnings
+                .push(format!("rlm index unavailable: {error}")),
+        }
+
+        analyzer.stdout = Some(stdout);
+        analyzer.stderr = analyzer_stderr;
+        Ok(analyzer)
+    }
+}
+
+impl Default for CodeSearchAdapter<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn format_section(name: &str, text: &str) -> String {
+    let body = text.trim_end();
+    if body.is_empty() {
+        format!("=== {name} ===")
+    } else {
+        format!("=== {name} ===\n{body}")
+    }
+}
+
+fn search_rlm_index(
+    db_path: &PathBuf,
+    args: &Map<String, Value>,
+) -> Result<Option<String>, String> {
+    let Some(query) = args.get("query").and_then(Value::as_str) else {
+        return Ok(None);
+    };
+    let query = query.trim();
+    if query.is_empty() {
+        return Ok(None);
+    }
+    let limit = args
+        .get("limit")
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(20);
+    let conn = Connection::open(db_path).map_err(|error| error.to_string())?;
+    let fts_query = format!("\"{}\"", query.replace('"', "\"\""));
+    let mut stmt = conn
+        .prepare(
+            "SELECT \
+               m.name, m.type, m.is_export, m.line, m.end_line, m.params, \
+               mod.rel_path AS module_path, mod.object_name, methods_fts.rank \
+             FROM methods_fts \
+             JOIN methods m ON m.id = methods_fts.rowid \
+             JOIN modules mod ON mod.id = m.module_id \
+             WHERE methods_fts MATCH ? \
+             ORDER BY methods_fts.rank \
+             LIMIT ?",
+        )
+        .map_err(|error| error.to_string())?;
+    let rows = stmt
+        .query_map(params![fts_query, limit as i64], |row| {
+            let method_type: String = row.get(1)?;
+            let is_export: i64 = row.get(2)?;
+            let params: Option<String> = row.get(5)?;
+            let params = params.unwrap_or_default();
+            let signature_params = format!("({})", params.trim());
+            Ok(format!(
+                "- {}:{} {} {}{}{}",
+                row.get::<_, String>(6)?,
+                row.get::<_, i64>(3)?,
+                method_type,
+                row.get::<_, String>(0)?,
+                signature_params,
+                if is_export != 0 { " export" } else { "" }
+            ))
+        })
+        .map_err(|error| error.to_string())?;
+
+    let mut lines = Vec::new();
+    for row in rows {
+        lines.push(row.map_err(|error| error.to_string())?);
+    }
+    if lines.is_empty() {
+        Ok(Some("No RLM method matches.".to_string()))
+    } else {
+        Ok(Some(lines.join("\n")))
     }
 }
 
@@ -816,8 +972,14 @@ fn _path_list(paths: &[PathBuf]) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::infrastructure::workspace_index::{IndexBackgroundJob, IndexCommand, IndexOutput};
+    use rusqlite::Connection;
     use serde_json::json;
     use std::cell::RefCell;
+    use std::fs;
+    use std::path::Path;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn standards_search_maps_to_v8std_search_request() {
@@ -1074,6 +1236,123 @@ mod tests {
     }
 
     #[test]
+    fn code_search_adapter_dry_run_builds_bsl_analyzer_search_command() {
+        let context = WorkspaceContext::discover(std::env::current_dir().unwrap()).unwrap();
+        let analyzer = FakeProcessRunner {
+            output: ProcessOutput {
+                status_success: true,
+                status: "exit status: 0".to_string(),
+                stdout: "ignored".to_string(),
+                stderr: String::new(),
+                timed_out: false,
+            },
+        };
+        let index = FakeIndexRunner::default();
+        let mut args = Map::new();
+        args.insert("query".to_string(), json!("ОбработкаПроведения"));
+
+        let outcome = CodeSearchAdapter::with_runners(&analyzer, &index)
+            .invoke("unica.code.search", &args, &context, true)
+            .unwrap();
+
+        let command = outcome.command.unwrap().join(" ");
+        assert!(command.contains("run-bsl-analyzer.sh"));
+        assert!(command.contains("search"));
+        assert!(command.contains("--query"));
+        assert!(command.contains("ОбработкаПроведения"));
+    }
+
+    #[test]
+    fn code_search_adapter_returns_analyzer_section_when_rlm_index_is_missing() {
+        let context = temp_context("search-missing");
+        fs::create_dir_all(context.workspace_root.join("src/CommonModules")).unwrap();
+        let analyzer = FakeProcessRunner {
+            output: ProcessOutput {
+                status_success: true,
+                status: "exit status: 0".to_string(),
+                stdout: "analyzer hit".to_string(),
+                stderr: String::new(),
+                timed_out: false,
+            },
+        };
+        let index = FakeIndexRunner {
+            outputs: RefCell::new(vec![index_success("Index not found: /tmp/bsl_index.db")]),
+            ..Default::default()
+        };
+        let mut args = Map::new();
+        args.insert("query".to_string(), json!("ОбработкаПроведения"));
+
+        let outcome = CodeSearchAdapter::with_runners(&analyzer, &index)
+            .invoke("unica.code.search", &args, &context, false)
+            .unwrap();
+
+        assert!(outcome.ok);
+        assert_eq!(
+            outcome.stdout.as_deref(),
+            Some("=== bsl-analyzer ===\nanalyzer hit")
+        );
+        assert!(outcome
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("rlm index unavailable")));
+        cleanup_context(&context);
+    }
+
+    #[test]
+    fn code_search_adapter_adds_rlm_section_when_index_is_ready() {
+        let context = temp_context("search-ready");
+        fs::create_dir_all(context.workspace_root.join("src/CommonModules")).unwrap();
+        let db_path = context.cache_root.join("rlm-tools-bsl/test/bsl_index.db");
+        create_rlm_search_db(&db_path);
+        let analyzer = FakeProcessRunner {
+            output: ProcessOutput {
+                status_success: true,
+                status: "exit status: 0".to_string(),
+                stdout: "analyzer hit".to_string(),
+                stderr: String::new(),
+                timed_out: false,
+            },
+        };
+        let index = FakeIndexRunner {
+            outputs: RefCell::new(vec![index_success(format!(
+                "Index: {}\n  Status:   fresh\n",
+                db_path.display()
+            ))]),
+            ..Default::default()
+        };
+        let mut args = Map::new();
+        args.insert("query".to_string(), json!("ОбработкаПроведения"));
+        args.insert("limit".to_string(), json!(5));
+
+        let outcome = CodeSearchAdapter::with_runners(&analyzer, &index)
+            .invoke("unica.code.search", &args, &context, false)
+            .unwrap();
+
+        let stdout = outcome.stdout.unwrap();
+        assert!(stdout.contains("=== bsl-analyzer ===\nanalyzer hit"));
+        assert!(stdout.contains("=== rlm ==="));
+        assert!(stdout.contains("CommonModules/Проведение.bsl:42"));
+        assert!(stdout.contains("Procedure ОбработкаПроведения() export"));
+        cleanup_context(&context);
+    }
+
+    #[test]
+    fn diagnostics_adapter_still_builds_bsl_analyzer_analyze_command() {
+        let context = WorkspaceContext::discover(std::env::current_dir().unwrap()).unwrap();
+        let mut args = Map::new();
+        args.insert("sourceDir".to_string(), json!("src"));
+
+        let outcome = CliAdapter::new("run-bsl-analyzer.sh", &["analyze"], "code analysis")
+            .invoke("unica.code.diagnostics", &args, &context, true, false)
+            .unwrap();
+
+        let command = outcome.command.unwrap().join(" ");
+        assert!(command.contains("run-bsl-analyzer.sh"));
+        assert!(command.contains("analyze"));
+        assert!(command.contains("--source-dir src"));
+    }
+
+    #[test]
     fn cli_adapter_rejects_raw_args_vector() {
         let context = WorkspaceContext::discover(std::env::current_dir().unwrap()).unwrap();
         let mut args = Map::new();
@@ -1248,6 +1527,106 @@ mod tests {
             self.commands.borrow_mut().push(command.clone());
             Ok(self.output.clone())
         }
+    }
+
+    #[derive(Default)]
+    struct FakeIndexRunner {
+        outputs: RefCell<Vec<IndexOutput>>,
+        commands: RefCell<Vec<IndexCommand>>,
+        backgrounds: RefCell<Vec<IndexBackgroundJob>>,
+    }
+
+    impl IndexRunner for FakeIndexRunner {
+        fn run(&self, command: &IndexCommand) -> Result<IndexOutput, String> {
+            self.commands.borrow_mut().push(command.clone());
+            if self.outputs.borrow().is_empty() {
+                return Ok(index_success("Index not found: /tmp/bsl_index.db"));
+            }
+            Ok(self.outputs.borrow_mut().remove(0))
+        }
+
+        fn start_background(&self, job: IndexBackgroundJob) -> Result<(), String> {
+            self.backgrounds.borrow_mut().push(job);
+            Ok(())
+        }
+    }
+
+    fn index_success(stdout: impl Into<String>) -> IndexOutput {
+        IndexOutput {
+            status_success: true,
+            status: "exit status: 0".to_string(),
+            stdout: stdout.into(),
+            stderr: String::new(),
+            timed_out: false,
+        }
+    }
+
+    fn temp_context(name: &str) -> WorkspaceContext {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("unica-code-search-{name}-{nanos}"));
+        fs::create_dir_all(&root).unwrap();
+        create_fake_plugin_root(&root);
+        WorkspaceContext {
+            cwd: root.clone(),
+            workspace_root: root.clone(),
+            cache_root: root.join(".build").join("unica"),
+            workspace_epoch: 1,
+        }
+    }
+
+    fn create_fake_plugin_root(root: &Path) {
+        let plugin_root = root.join("plugins").join("unica");
+        fs::create_dir_all(plugin_root.join("skills")).unwrap();
+        fs::create_dir_all(plugin_root.join("scripts")).unwrap();
+        fs::write(plugin_root.join("scripts").join("run-bsl-analyzer.sh"), "").unwrap();
+        fs::write(plugin_root.join("scripts").join("run-rlm-bsl-index.sh"), "").unwrap();
+    }
+
+    fn create_rlm_search_db(db_path: &PathBuf) {
+        fs::create_dir_all(db_path.parent().unwrap()).unwrap();
+        let conn = Connection::open(db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE modules (
+                id INTEGER PRIMARY KEY,
+                rel_path TEXT NOT NULL,
+                object_name TEXT NOT NULL
+            );
+            CREATE TABLE methods (
+                id INTEGER PRIMARY KEY,
+                module_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL,
+                is_export INTEGER NOT NULL,
+                line INTEGER NOT NULL,
+                end_line INTEGER NOT NULL,
+                params TEXT
+            );
+            CREATE VIRTUAL TABLE methods_fts USING fts5(name, object_name, tokenize='trigram');",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO modules (id, rel_path, object_name) VALUES (1, ?1, ?2)",
+            ("CommonModules/Проведение.bsl", "Проведение"),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO methods (id, module_id, name, type, is_export, line, end_line, params)
+             VALUES (1, 1, ?1, 'Procedure', 1, 42, 55, '')",
+            ("ОбработкаПроведения",),
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO methods_fts(rowid, name, object_name) VALUES (1, ?1, ?2)",
+            ("ОбработкаПроведения", "Проведение"),
+        )
+        .unwrap();
+    }
+
+    fn cleanup_context(context: &WorkspaceContext) {
+        let _ = fs::remove_dir_all(&context.workspace_root);
     }
 
     struct FakeHttpClient {
