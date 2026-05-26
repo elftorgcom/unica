@@ -246,7 +246,7 @@ if [ "$DO_VERIFY" -eq 1 ]; then
   mkdir -p "$CODEX_HOME_DIR/tmp"
   PROMPT_PROOF="$CODEX_HOME_DIR/tmp/unica-install-prompt-input.json"
   codex debug prompt-input 'test' > "$PROMPT_PROOF"
-  for needle in "Unica" "workspace-init" "db-auth-check"; do
+  for needle in "Unica" "v8-runner" "meta-compile" "db-auth-check"; do
     if ! grep -q "$needle" "$PROMPT_PROOF"; then
       echo "Codex prompt verification did not contain '$needle'." >&2
       echo "Saved prompt proof: $PROMPT_PROOF" >&2

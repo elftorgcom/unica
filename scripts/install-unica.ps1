@@ -225,7 +225,7 @@ try {
     $pluginCacheDir = Join-Path $codexHome "plugins\cache\$marketplaceName\unica"
     $pluginCacheVersionDir = Join-Path $pluginCacheDir $pluginVersion
 
-    & codex plugin marketplace remove $marketplaceName | Out-Null
+    & codex plugin marketplace remove $marketplaceName *> $null
     if (Test-Path -LiteralPath $pluginCacheDir) {
         Write-Output "==> Removing stale Codex plugin cache: $pluginCacheDir"
         Remove-Item -LiteralPath $pluginCacheDir -Recurse -Force
@@ -241,7 +241,7 @@ try {
         New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
         $promptProof = Join-Path $tmpDir "unica-install-prompt-input.json"
         & codex debug prompt-input "test" > $promptProof
-        foreach ($needle in @("Unica", "workspace-init", "db-auth-check")) {
+        foreach ($needle in @("Unica", "v8-runner", "meta-compile", "db-auth-check")) {
             if (-not (Select-String -LiteralPath $promptProof -Pattern $needle -Quiet)) {
                 throw "Codex prompt verification did not contain '$needle'. Saved prompt proof: $promptProof"
             }

@@ -41,6 +41,17 @@ def run_ps_script(*args: str, env: dict[str, str] | None = None) -> subprocess.C
     )
 
 
+class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
+    def test_installers_verify_current_skill_surface(self) -> None:
+        for script in [SCRIPT, PS_SCRIPT]:
+            with self.subTest(script=script.name):
+                text = script.read_text(encoding="utf-8")
+                self.assertIn("v8-runner", text)
+                self.assertIn("meta-compile", text)
+                self.assertIn("db-auth-check", text)
+                self.assertNotIn("workspace-init", text)
+
+
 @unittest.skipIf(os.name == "nt", "install-unica.sh URL checks run on POSIX CI")
 class InstallUnicaScriptTests(unittest.TestCase):
     def test_prints_latest_release_asset_url_for_target(self) -> None:
