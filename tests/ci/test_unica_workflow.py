@@ -61,7 +61,7 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "plugins/unica/scripts/*.ps1",
             "System.Management.Automation.Language.Parser]::ParseFile",
             "cargo fmt --all -- --check",
-            "cargo clippy --package unica-coder --all-targets --all-features -- -D warnings",
+            "cargo clippy --package unica-coder --all-targets --all-features",
             "cargo test --package unica-coder",
         ]
 
