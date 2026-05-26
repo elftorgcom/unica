@@ -28,6 +28,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
             "targets": {
                 "darwin-arm64": {"targetTriple": "aarch64-apple-darwin"},
                 "linux-x64": {"targetTriple": "x86_64-unknown-linux-musl"},
+                "win-x64": {"targetTriple": "x86_64-pc-windows-msvc"},
             },
             "tools": [
                 {
@@ -40,6 +41,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
                     "assets": {
                         "darwin-arm64": {"assetName": "v8-runner"},
                         "linux-x64": {"assetName": "v8-runner"},
+                        "win-x64": {"assetName": "v8-runner.exe"},
                     },
                 }
             ],
@@ -67,6 +69,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
         target_triples = {
             "darwin-arm64": "aarch64-apple-darwin",
             "linux-x64": "x86_64-unknown-linux-musl",
+            "win-x64": "x86_64-pc-windows-msvc",
         }
         (bundle / "tools.json").write_text(
             json.dumps(
@@ -131,6 +134,65 @@ class PackageUnicaPluginTests(unittest.TestCase):
             "unica-codex-marketplace-darwin-arm64",
         )
         self.assertEqual(module.archive_base_name("0.3.3", target=None), "unica-codex-marketplace-0.3.3")
+
+    def test_write_target_mcp_uses_powershell_launcher_for_windows_package(self) -> None:
+        module = load_package_module()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / ".mcp.json"
+            dest = root / "out.mcp.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "mcpServers": {
+                            "unica": {
+                                "command": "bash",
+                                "args": ["-lc", "exec ./plugins/unica/scripts/run-unica.sh"],
+                                "note": "Single public Unica stdio MCP orchestrator.",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            module.write_target_mcp(source, dest, target="win-x64")
+
+            server = json.loads(dest.read_text(encoding="utf-8"))["mcpServers"]["unica"]
+            self.assertEqual(server["command"], "pwsh")
+            self.assertEqual(
+                server["args"],
+                ["-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1"],
+            )
+
+    def test_write_target_mcp_keeps_shell_launcher_for_posix_package(self) -> None:
+        module = load_package_module()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / ".mcp.json"
+            dest = root / "out.mcp.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "mcpServers": {
+                            "unica": {
+                                "command": "bash",
+                                "args": ["-lc", "exec ./plugins/unica/scripts/run-unica.sh"],
+                                "note": "Single public Unica stdio MCP orchestrator.",
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            module.write_target_mcp(source, dest, target="linux-x64")
+
+            server = json.loads(dest.read_text(encoding="utf-8"))["mcpServers"]["unica"]
+            self.assertEqual(server["command"], "bash")
+            self.assertIn("run-unica.sh", " ".join(server["args"]))
 
     def test_write_marketplace_can_use_local_debug_name(self) -> None:
         module = load_package_module()
@@ -200,7 +262,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
             binary.write_text(
                 "#!/usr/bin/env sh\n"
                 "if [ \"$1\" = \"--help\" ]; then\n"
-                "  echo 'unica 0.4.1'\n"
+                "  echo 'unica 0.4.2'\n"
                 "  echo 'stdio MCP orchestrator for Unica workflows'\n"
                 "  exit 0\n"
                 "fi\n"
@@ -216,7 +278,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
                         "tools": [
                             {
                                 "name": "unica",
-                                "version": "0.4.1",
+                                "version": "0.4.2",
                                 "repository": "https://github.com/IngvarConsulting/unica",
                                 "upstreamUrl": "https://github.com/IngvarConsulting/unica/releases/tag/workspace",
                                 "sourceTag": "workspace",
@@ -240,7 +302,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
                         "tools": [
                             {
                                 "name": "unica",
-                                "version": "0.4.1",
+                                "version": "0.4.2",
                                 "repository": "https://github.com/IngvarConsulting/unica",
                                 "sourceTag": "workspace",
                                 "sourceCommit": "workspace",
@@ -297,7 +359,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
                 stderr=subprocess.PIPE,
                 check=True,
             )
-            self.assertIn("unica 0.4.1", result.stdout)
+            self.assertIn("unica 0.4.2", result.stdout)
 
 
 if __name__ == "__main__":

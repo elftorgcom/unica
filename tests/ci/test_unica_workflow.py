@@ -23,6 +23,7 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "plugins/unica/**",
             "scripts/ci/**",
             "scripts/install-unica.sh",
+            "scripts/install-unica.ps1",
             "tests/ci/**",
             "tests/fixtures/**",
             "spec/**",
@@ -48,6 +49,10 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "python -m json.tool plugins/unica/third-party/tools.lock.json >/dev/null",
             "python -m json.tool plugins/unica/third-party/manifest.json >/dev/null",
             "bash -n plugins/unica/scripts/*.sh",
+            "Check PowerShell launchers",
+            "pwsh -NoProfile -Command",
+            "plugins/unica/scripts/*.ps1",
+            "System.Management.Automation.Language.Parser]::ParseFile",
             "cargo fmt --all -- --check",
             "cargo clippy --package unica-coder --all-targets --all-features -- -D warnings",
             "cargo test --package unica-coder",
@@ -63,6 +68,23 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
         self.assertIn("needs: verify-source", text)
         self.assertIn("uses: dtolnay/rust-toolchain@stable", text)
         self.assertIn("python scripts/ci/build-unica-tools.py", text)
+
+    def test_release_workflow_publishes_both_installers_and_smokes_windows_package(self) -> None:
+        text = self.workflow_text()
+        required_tokens = [
+            "cp scripts/install-unica.sh dist/install-unica.sh",
+            "cp scripts/install-unica.ps1 dist/install-unica.ps1",
+            "dist/install-unica.sh",
+            "dist/install-unica.ps1",
+            "Smoke Windows package MCP launcher",
+            "unica-codex-marketplace-win-x64.zip",
+            "pwsh -NoProfile -Command",
+            "run-unica.ps1",
+        ]
+
+        for token in required_tokens:
+            with self.subTest(token=token):
+                self.assertIn(token, text)
 
 
 if __name__ == "__main__":

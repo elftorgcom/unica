@@ -192,6 +192,20 @@ def write_official_marketplace(source_path: Path, dest_path: Path, *, marketplac
     dest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def write_target_mcp(source_path: Path, dest_path: Path, *, target: str | None) -> None:
+    data = json.loads(source_path.read_text(encoding="utf-8"))
+    if target == "win-x64":
+        server = data["mcpServers"][PLUGIN_ID]
+        server["command"] = "pwsh"
+        server["args"] = [
+            "-NoProfile",
+            "-File",
+            f"./plugins/{PLUGIN_ID}/scripts/run-unica.ps1",
+        ]
+
+    dest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def assert_archive_clean(marketplace_dir: Path) -> None:
     for path in marketplace_dir.rglob("*"):
         rel = path.relative_to(marketplace_dir)
@@ -275,6 +289,7 @@ def main() -> None:
                     continue
                 copy_binary_tree(target_dir, plugin_dst / "bin" / target_dir.name)
 
+    write_target_mcp(plugin_src / ".mcp.json", plugin_dst / ".mcp.json", target=args.target)
     write_manifest(plugin_dst, grouped_tools, lock_file)
 
     json.loads((plugin_dst / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))

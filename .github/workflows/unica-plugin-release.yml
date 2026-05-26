@@ -12,6 +12,7 @@ on:
       - "plugins/unica/**"
       - "scripts/ci/**"
       - "scripts/install-unica.sh"
+      - "scripts/install-unica.ps1"
       - "tests/ci/**"
       - "tests/fixtures/**"
       - "spec/**"
@@ -56,6 +57,9 @@ jobs:
 
       - name: Check shell launchers
         run: bash -n plugins/unica/scripts/*.sh
+
+      - name: Check PowerShell launchers
+        run: pwsh -NoProfile -Command "$ErrorActionPreference = 'Stop'; Get-ChildItem plugins/unica/scripts/*.ps1 | ForEach-Object { $errors = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors); if ($errors) { throw $errors[0] } }"
 
       - name: Check Rust formatting
         run: cargo fmt --all -- --check
@@ -134,6 +138,11 @@ jobs:
           --target "${{ matrix.target }}"
           --allow-partial-targets
 
+      - name: Smoke Windows package MCP launcher
+        if: matrix.target == 'win-x64'
+        run: |
+          pwsh -NoProfile -Command "$ErrorActionPreference = 'Stop'; $extract = '.build/win-x64-smoke'; Remove-Item -Recurse -Force $extract -ErrorAction SilentlyContinue; Expand-Archive -LiteralPath 'dist/unica-codex-marketplace-win-x64.zip' -DestinationPath $extract -Force; $mcp = Get-ChildItem -LiteralPath $extract -Recurse -File -Filter '.mcp.json' | Select-Object -First 1; if (-not $mcp) { throw 'missing .mcp.json' }; $server = (Get-Content -LiteralPath $mcp.FullName -Raw | ConvertFrom-Json).mcpServers.unica; if ($server.command -ne 'pwsh') { throw 'win-x64 .mcp.json must use pwsh' }; if (($server.args -join ' ') -notmatch 'run-unica.ps1') { throw 'win-x64 .mcp.json must reference run-unica.ps1' }; $launcher = Get-ChildItem -LiteralPath $extract -Recurse -File -Filter 'run-unica.ps1' | Select-Object -First 1; if (-not $launcher) { throw 'missing run-unica.ps1' }; $errors = $null; $null = [System.Management.Automation.Language.Parser]::ParseFile($launcher.FullName, [ref]$null, [ref]$errors); if ($errors) { throw $errors[0] }"
+
       - uses: actions/upload-artifact@v4
         with:
           name: unica-codex-marketplace-${{ matrix.target }}
@@ -161,15 +170,20 @@ jobs:
         run: |
           mkdir -p dist
           cp scripts/install-unica.sh dist/install-unica.sh
+          cp scripts/install-unica.ps1 dist/install-unica.ps1
 
       - uses: actions/upload-artifact@v4
         with:
           name: unica-installer
-          path: dist/install-unica.sh
+          path: |
+            dist/install-unica.sh
+            dist/install-unica.ps1
           if-no-files-found: error
 
       - name: Publish installer asset
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/install-unica.sh
+          files: |
+            dist/install-unica.sh
+            dist/install-unica.ps1

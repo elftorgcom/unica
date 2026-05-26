@@ -8,6 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "install-unica.sh"
+PS_SCRIPT = REPO_ROOT / "scripts" / "install-unica.ps1"
 
 
 def script_command(*args: str) -> list[str]:
@@ -19,6 +20,18 @@ def script_command(*args: str) -> list[str]:
 def run_script(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         script_command(*args),
+        check=False,
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+
+def run_ps_script(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["pwsh", "-NoProfile", "-File", str(PS_SCRIPT), *args],
         check=False,
         cwd=REPO_ROOT,
         env=env,
@@ -66,6 +79,46 @@ class InstallUnicaScriptTests(unittest.TestCase):
             "https://github.com/IngvarConsulting/unica/releases/latest/download/"
             "unica-codex-marketplace-win-x64.zip",
         )
+
+
+@unittest.skipUnless(os.name == "nt", "install-unica.ps1 URL checks run on Windows CI")
+class InstallUnicaPowerShellScriptTests(unittest.TestCase):
+    def test_prints_latest_windows_release_asset_url_by_default(self) -> None:
+        result = run_ps_script("-PrintDownloadUrl")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.strip(),
+            "https://github.com/IngvarConsulting/unica/releases/latest/download/"
+            "unica-codex-marketplace-win-x64.zip",
+        )
+
+    def test_prints_pinned_release_asset_url_for_target(self) -> None:
+        result = run_ps_script(
+            "-Target",
+            "win-x64",
+            "-Version",
+            "v0.4.2",
+            "-PrintDownloadUrl",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.strip(),
+            "https://github.com/IngvarConsulting/unica/releases/download/v0.4.2/"
+            "unica-codex-marketplace-win-x64.zip",
+        )
+
+    def test_print_download_url_does_not_require_codex_home(self) -> None:
+        env = os.environ.copy()
+        env.pop("CODEX_HOME", None)
+        env.pop("HOME", None)
+        env.pop("USERPROFILE", None)
+
+        result = run_ps_script("-PrintDownloadUrl", env=env)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("unica-codex-marketplace-win-x64.zip", result.stdout.strip())
 
 
 if __name__ == "__main__":
