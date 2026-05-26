@@ -88,8 +88,9 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "Smoke Windows package MCP launcher",
             "unica-codex-marketplace-win-x64.zip",
             'GH_TOKEN: ${{ github.token }}',
-            "gh release create",
-            "gh release upload",
+            "api.github.com/repos/${GITHUB_REPOSITORY}/releases",
+            "releases/tags/${RELEASE_TAG}",
+            "--data-binary @\"${asset}\"",
             "shell: pwsh",
             "run-unica.ps1",
         ]

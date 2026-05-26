@@ -206,11 +206,17 @@ jobs:
             RELEASE_TAG="v0.4.2"
           fi
           echo "Uploading release assets to ${RELEASE_TAG}"
-          gh release upload "${RELEASE_TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
-            "dist/unica-codex-marketplace-${{ matrix.target }}.zip" \
-            --clobber
+          release_json="$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          upload_url="$(printf '%s' "${release_json}" | python -c "import json,sys; print(json.load(sys.stdin)['upload_url'].split('{', 1)[0])")"
+          for asset in "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" "dist/unica-codex-marketplace-${{ matrix.target }}.zip"; do
+            name="$(basename "${asset}")"
+            existing_id="$(printf '%s' "${release_json}" | python -c "import json,sys; name=sys.argv[1]; print(next((str(a['id']) for a in json.load(sys.stdin).get('assets', []) if a.get('name') == name), ''))" "${name}")"
+            if [ -n "${existing_id}" ]; then
+              curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
+            fi
+            encoded_name="$(python -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "${name}")"
+            curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+          done
 
   create-release:
     name: Create GitHub release
@@ -246,7 +252,12 @@ jobs:
             RELEASE_TAG="v0.4.2"
           fi
           echo "Publishing release ${RELEASE_TAG}"
-          gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --title "${RELEASE_TAG}" --notes "Release ${RELEASE_TAG}"
+          api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/releases"
+          if ! curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api_url}/tags/${RELEASE_TAG}" >/dev/null; then
+            payload="$(python -c "import json; print(json.dumps({'tag_name': 'v0.4.2', 'name': 'v0.4.2', 'body': 'Release v0.4.2'}))")"
+            curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/json" --data "${payload}" "${api_url}" >/dev/null
+          fi
+          curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "${api_url}/tags/${RELEASE_TAG}" >/dev/null
 
   installer:
     name: Publish installer script
@@ -302,8 +313,14 @@ jobs:
             RELEASE_TAG="v0.4.2"
           fi
           echo "Uploading installer assets to ${RELEASE_TAG}"
-          gh release upload "${RELEASE_TAG}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            dist/install-unica.sh \
-            dist/install-unica.ps1 \
-            --clobber
+          release_json="$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          upload_url="$(printf '%s' "${release_json}" | python -c "import json,sys; print(json.load(sys.stdin)['upload_url'].split('{', 1)[0])")"
+          for asset in dist/install-unica.sh dist/install-unica.ps1; do
+            name="$(basename "${asset}")"
+            existing_id="$(printf '%s' "${release_json}" | python -c "import json,sys; name=sys.argv[1]; print(next((str(a['id']) for a in json.load(sys.stdin).get('assets', []) if a.get('name') == name), ''))" "${name}")"
+            if [ -n "${existing_id}" ]; then
+              curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
+            fi
+            encoded_name="$(python -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "${name}")"
+            curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+          done
