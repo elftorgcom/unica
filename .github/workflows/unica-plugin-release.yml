@@ -41,9 +41,11 @@ jobs:
       - name: Install Python test dependencies
         run: python -m pip install -r tests/ci/requirements.txt
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustup component add rustfmt clippy
 
       - name: Test CI helper scripts
         run: python -m unittest discover -s tests/ci
@@ -104,7 +106,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Build target bundle
         run: >
@@ -189,11 +194,14 @@ jobs:
 
       - name: Publish release assets
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz
-            dist/unica-codex-marketplace-${{ matrix.target }}.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
+          gh release upload "${GITHUB_REF_NAME}" \
+            "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
+            "dist/unica-codex-marketplace-${{ matrix.target }}.zip" \
+            --clobber
 
   installer:
     name: Publish installer script
@@ -218,8 +226,11 @@ jobs:
 
       - name: Publish installer asset
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/install-unica.sh
-            dist/install-unica.ps1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
+          gh release upload "${GITHUB_REF_NAME}" \
+            dist/install-unica.sh \
+            dist/install-unica.ps1 \
+            --clobber

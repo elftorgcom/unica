@@ -46,7 +46,9 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "uses: actions/setup-python@v5",
             'python-version: "3.12"',
             "python -m pip install -r tests/ci/requirements.txt",
-            "uses: dtolnay/rust-toolchain@stable",
+            "Set up Rust",
+            "rustup toolchain install stable --profile minimal",
+            "rustup component add rustfmt clippy",
             "python -m unittest discover -s tests/ci",
             "python -m py_compile scripts/ci/*.py tests/ci/*.py",
             "python -m json.tool plugins/unica/.codex-plugin/plugin.json >/dev/null",
@@ -71,7 +73,7 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
         text = self.workflow_text()
         self.assertIn("build-tools:", text)
         self.assertIn("needs: verify-source", text)
-        self.assertIn("uses: dtolnay/rust-toolchain@stable", text)
+        self.assertIn("rustup toolchain install stable --profile minimal", text)
         self.assertIn("python scripts/ci/build-unica-tools.py", text)
 
     def test_release_workflow_publishes_both_installers_and_smokes_windows_package(self) -> None:
@@ -83,6 +85,9 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "dist/install-unica.ps1",
             "Smoke Windows package MCP launcher",
             "unica-codex-marketplace-win-x64.zip",
+            'GH_TOKEN: ${{ github.token }}',
+            "gh release create",
+            "gh release upload",
             "shell: pwsh",
             "run-unica.ps1",
         ]
