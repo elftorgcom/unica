@@ -199,6 +199,10 @@ jobs:
           PY
           )"
           if [ -z "${RELEASE_TAG}" ]; then
+            git fetch --force origin "refs/tags/v*:refs/tags/v*" || true
+            RELEASE_TAG="$(git tag --points-at HEAD | grep '^v' | sort -V | tail -n 1)"
+          fi
+          if [ -z "${RELEASE_TAG}" ]; then
             echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
             exit 0
           fi
@@ -293,6 +297,10 @@ jobs:
                   break
           PY
           )"
+          if [ -z "${RELEASE_TAG}" ]; then
+            git fetch --force origin "refs/tags/v*:refs/tags/v*" || true
+            RELEASE_TAG="$(git tag --points-at HEAD | grep '^v' | sort -V | tail -n 1)"
+          fi
           if [ -z "${RELEASE_TAG}" ]; then
             echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
             exit 0
