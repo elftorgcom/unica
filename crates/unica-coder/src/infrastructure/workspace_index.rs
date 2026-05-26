@@ -212,7 +212,7 @@ impl<'a> WorkspaceIndexService<'a> {
         let plugin_root = find_plugin_root(&context.cwd).ok_or_else(|| {
             "could not locate Unica plugin root for internal RLM index adapter lookup".to_string()
         })?;
-        let launcher = plugin_root.join("scripts").join("run-rlm-bsl-index.sh");
+        let launcher = resolve_launcher(&plugin_root, "run-rlm-bsl-index.sh");
         if !launcher.exists() {
             return Err(format!(
                 "internal RLM index launcher not found: {}",
@@ -228,24 +228,36 @@ impl<'a> WorkspaceIndexService<'a> {
                 .to_string(),
         )];
         let root = source_root.display().to_string();
+        let info = index_invocation(
+            &launcher,
+            vec!["index".to_string(), "info".to_string(), root.clone()],
+        );
+        let build = index_invocation(
+            &launcher,
+            vec!["index".to_string(), "build".to_string(), root.clone()],
+        );
+        let update = index_invocation(
+            &launcher,
+            vec!["index".to_string(), "update".to_string(), root],
+        );
         Ok(IndexCommands {
             info: IndexCommand {
-                program: launcher.clone(),
-                args: vec!["index".to_string(), "info".to_string(), root.clone()],
+                program: info.0,
+                args: info.1,
                 cwd: context.cwd.clone(),
                 env: env.clone(),
                 timeout: INDEX_TIMEOUT,
             },
             build: IndexCommand {
-                program: launcher.clone(),
-                args: vec!["index".to_string(), "build".to_string(), root.clone()],
+                program: build.0,
+                args: build.1,
                 cwd: context.cwd.clone(),
                 env: env.clone(),
                 timeout: Duration::from_secs(24 * 60 * 60),
             },
             update: IndexCommand {
-                program: launcher,
-                args: vec!["index".to_string(), "update".to_string(), root],
+                program: update.0,
+                args: update.1,
                 cwd: context.cwd.clone(),
                 env,
                 timeout: Duration::from_secs(24 * 60 * 60),
@@ -314,6 +326,32 @@ impl<'a> WorkspaceIndexService<'a> {
         IndexStartReport {
             warnings: vec![warning.to_string()],
         }
+    }
+}
+
+fn resolve_launcher(plugin_root: &Path, launcher: &str) -> PathBuf {
+    let script_name = if cfg!(target_os = "windows") {
+        launcher
+            .strip_suffix(".sh")
+            .map(|stem| format!("{stem}.ps1"))
+            .unwrap_or_else(|| launcher.to_string())
+    } else {
+        launcher.to_string()
+    };
+    plugin_root.join("scripts").join(script_name)
+}
+
+fn index_invocation(launcher: &Path, args: Vec<String>) -> (PathBuf, Vec<String>) {
+    if cfg!(target_os = "windows") {
+        let mut pwsh_args = vec![
+            "-NoProfile".to_string(),
+            "-File".to_string(),
+            launcher.display().to_string(),
+        ];
+        pwsh_args.extend(args);
+        (PathBuf::from("pwsh"), pwsh_args)
+    } else {
+        (launcher.to_path_buf(), args)
     }
 }
 
@@ -653,11 +691,32 @@ mod tests {
         let report = service.start_for_workspace(&context, &Map::new(), false);
 
         assert_eq!(report.warnings, vec!["rlm index build started".to_string()]);
+        #[cfg(target_os = "windows")]
+        {
+            let commands = runner.commands.borrow();
+            let command = &commands[0];
+            assert_eq!(command.program, PathBuf::from("pwsh"));
+            assert_eq!(&command.args[0..2], ["-NoProfile", "-File"]);
+            assert!(command.args[2].contains("run-rlm-bsl-index.ps1"));
+            assert_eq!(command.args[3..5], ["index", "info"]);
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let backgrounds = runner.backgrounds.borrow();
+            let command = &backgrounds[0].primary;
+            assert_eq!(command.program, PathBuf::from("pwsh"));
+            assert_eq!(&command.args[0..2], ["-NoProfile", "-File"]);
+            assert!(command.args[2].contains("run-rlm-bsl-index.ps1"));
+            assert_eq!(command.args[3..5], ["index", "build"]);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
         assert_eq!(runner.commands.borrow()[0].args[0..2], ["index", "info"]);
         assert_eq!(
             runner.backgrounds.borrow()[0].primary.args[0..2],
             ["index", "build"]
         );
+        }
         assert_eq!(
             runner.backgrounds.borrow()[0].primary.env[0].0,
             "RLM_INDEX_DIR"
@@ -783,6 +842,7 @@ mod tests {
         fs::create_dir_all(plugin_root.join("skills")).unwrap();
         fs::create_dir_all(plugin_root.join("scripts")).unwrap();
         fs::write(plugin_root.join("scripts").join("run-rlm-bsl-index.sh"), "").unwrap();
+        fs::write(plugin_root.join("scripts").join("run-rlm-bsl-index.ps1"), "").unwrap();
     }
 
     fn cleanup(context: &WorkspaceContext) {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -9,8 +10,18 @@ from pathlib import Path
 
 
 class UnicaMcpSmokeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        if shutil.which("cargo") is None:
+            self.skipTest("cargo is required for source-tree MCP smoke tests")
+
     def repo_root(self) -> Path:
         return Path(__file__).resolve().parents[2]
+
+    def launcher_command(self) -> list[str]:
+        scripts = self.repo_root() / "plugins" / "unica" / "scripts"
+        if os.name == "nt":
+            return ["pwsh", "-NoProfile", "-File", str(scripts / "run-unica.ps1")]
+        return [str(scripts / "run-unica.sh")]
 
     def call_mcp(self, messages: list[dict], *, cache_dir: Path | None = None) -> list[dict]:
         env = os.environ.copy()
@@ -18,7 +29,7 @@ class UnicaMcpSmokeTests(unittest.TestCase):
             env["UNICA_CACHE_DIR"] = str(cache_dir)
         payload = "\n".join(json.dumps(message) for message in messages) + "\n"
         result = subprocess.run(
-            [str(self.repo_root() / "plugins" / "unica" / "scripts" / "run-unica.sh")],
+            self.launcher_command(),
             input=payload,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -98,4 +109,5 @@ class UnicaMcpSmokeTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["cache"]["mode"], "dry-run")
         self.assertIn("SourceSetChanged", payload["cache"]["events"])
-        self.assertIn("run-v8-runner.sh", " ".join(payload["command"]))
+        expected_launcher = "run-v8-runner.ps1" if os.name == "nt" else "run-v8-runner.sh"
+        self.assertIn(expected_launcher, " ".join(payload["command"]))

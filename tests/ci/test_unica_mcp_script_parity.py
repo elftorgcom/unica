@@ -1259,6 +1259,9 @@ class UnicaMcpScriptParityTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        if shutil.which("cargo") is None:
+            raise unittest.SkipTest("cargo is required for MCP script parity tests")
+
         subprocess.run(
             ["cargo", "build", "--quiet", "--package", "unica-coder", "--bin", "unica"],
             cwd=REPO_ROOT,

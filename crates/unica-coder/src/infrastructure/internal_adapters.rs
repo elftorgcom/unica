@@ -7,7 +7,7 @@ use crate::infrastructure::AdapterOutcome;
 use rusqlite::{params, Connection};
 use serde_json::{json, Map, Value};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -28,6 +28,13 @@ pub struct ProcessOutput {
     pub stdout: String,
     pub stderr: String,
     pub timed_out: bool,
+}
+
+#[derive(Debug, Clone)]
+struct LauncherInvocation {
+    program: PathBuf,
+    args: Vec<String>,
+    display: Vec<String>,
 }
 
 pub trait ProcessRunner {
@@ -93,11 +100,14 @@ impl<'a> CliAdapter<'a> {
         let plugin_root = find_plugin_root(&context.cwd).ok_or_else(|| {
             "could not locate Unica plugin root for internal adapter lookup".to_string()
         })?;
-        let launcher = plugin_root.join("scripts").join(self.launcher);
-        let mut command = vec![launcher.display().to_string()];
-        command.extend(self.default_command.iter().map(|part| (*part).to_string()));
-        command.extend(cli_args(args, true)?);
+        let launcher = resolve_launcher(&plugin_root, self.launcher);
+        let report_args = cli_args(args, true)?;
         let execution_args = cli_args(args, false)?;
+        let invocation = launcher_invocation(
+            &launcher,
+            self.default_command.iter().map(|part| (*part).to_string()),
+            report_args,
+        );
 
         if dry_run {
             return Ok(AdapterOutcome {
@@ -123,7 +133,7 @@ impl<'a> CliAdapter<'a> {
                 artifacts: Vec::new(),
                 stdout: None,
                 stderr: None,
-                command: Some(command),
+                command: Some(invocation.display),
             });
         }
 
@@ -134,15 +144,16 @@ impl<'a> CliAdapter<'a> {
             ));
         }
 
-        let mut process_args = self
+        let process_args = self
             .default_command
             .iter()
             .map(|part| (*part).to_string())
             .collect::<Vec<_>>();
-        process_args.extend(execution_args);
+        let invocation = launcher_invocation(&launcher, process_args, execution_args);
+        let display_command = invocation.display.clone();
         let output = self.runner.run(&ProcessCommand {
-            program: launcher.clone(),
-            args: process_args,
+            program: invocation.program,
+            args: invocation.args,
             cwd: context.cwd.clone(),
             timeout: DEFAULT_PROCESS_TIMEOUT,
         })?;
@@ -186,7 +197,7 @@ impl<'a> CliAdapter<'a> {
             artifacts: Vec::new(),
             stdout: Some(output.stdout),
             stderr: Some(output.stderr),
-            command: Some(command),
+            command: Some(display_command),
         })
     }
 }
@@ -213,11 +224,10 @@ impl<'a> RuntimeAdapter<'a> {
         let plugin_root = find_plugin_root(&context.cwd).ok_or_else(|| {
             "could not locate Unica plugin root for internal adapter lookup".to_string()
         })?;
-        let launcher = plugin_root.join("scripts").join("run-v8-runner.sh");
+        let launcher = resolve_launcher(&plugin_root, "run-v8-runner.sh");
         let report_args = runtime_args(args, true)?;
         let execution_args = runtime_args(args, false)?;
-        let mut command = vec![launcher.display().to_string()];
-        command.extend(report_args);
+        let report_invocation = launcher_invocation(&launcher, Vec::<String>::new(), report_args);
 
         if dry_run {
             return Ok(AdapterOutcome {
@@ -242,7 +252,7 @@ impl<'a> RuntimeAdapter<'a> {
                 artifacts: Vec::new(),
                 stdout: None,
                 stderr: None,
-                command: Some(command),
+                command: Some(report_invocation.display),
             });
         }
 
@@ -253,9 +263,11 @@ impl<'a> RuntimeAdapter<'a> {
             ));
         }
 
+        let invocation = launcher_invocation(&launcher, Vec::<String>::new(), execution_args);
+        let display_command = invocation.display.clone();
         let output = self.runner.run(&ProcessCommand {
-            program: launcher.clone(),
-            args: execution_args,
+            program: invocation.program,
+            args: invocation.args,
             cwd: context.cwd.clone(),
             timeout: DEFAULT_PROCESS_TIMEOUT,
         })?;
@@ -295,7 +307,7 @@ impl<'a> RuntimeAdapter<'a> {
             artifacts: Vec::new(),
             stdout: Some(output.stdout),
             stderr: Some(output.stderr),
-            command: Some(command),
+            command: Some(display_command),
         })
     }
 }
@@ -389,6 +401,58 @@ fn format_section(name: &str, text: &str) -> String {
         format!("=== {name} ===")
     } else {
         format!("=== {name} ===\n{body}")
+    }
+}
+
+fn resolve_launcher(plugin_root: &Path, launcher: &str) -> PathBuf {
+    let script_name = platform_launcher_name(launcher);
+    plugin_root.join("scripts").join(script_name)
+}
+
+fn platform_launcher_name(launcher: &str) -> String {
+    if cfg!(target_os = "windows") {
+        launcher
+            .strip_suffix(".sh")
+            .map(|stem| format!("{stem}.ps1"))
+            .unwrap_or_else(|| launcher.to_string())
+    } else {
+        launcher.to_string()
+    }
+}
+
+fn launcher_invocation(
+    launcher: &Path,
+    prefix_args: impl IntoIterator<Item = String>,
+    args: impl IntoIterator<Item = String>,
+) -> LauncherInvocation {
+    let mut tool_args = prefix_args.into_iter().collect::<Vec<_>>();
+    tool_args.extend(args);
+
+    if cfg!(target_os = "windows") {
+        let mut pwsh_args = vec![
+            "-NoProfile".to_string(),
+            "-File".to_string(),
+            launcher.display().to_string(),
+        ];
+        pwsh_args.extend(tool_args);
+
+        let mut display = vec!["pwsh".to_string()];
+        display.extend(pwsh_args.clone());
+
+        LauncherInvocation {
+            program: PathBuf::from("pwsh"),
+            args: pwsh_args,
+            display,
+        }
+    } else {
+        let mut display = vec![launcher.display().to_string()];
+        display.extend(tool_args.clone());
+
+        LauncherInvocation {
+            program: launcher.to_path_buf(),
+            args: tool_args,
+            display,
+        }
     }
 }
 
@@ -1017,7 +1081,7 @@ mod tests {
             .unwrap();
 
         let command = outcome.command.unwrap().join(" ");
-        assert!(command.contains("run-v8-runner.sh"));
+        assert!(command.contains(expected_launcher("run-v8-runner")));
         assert!(command.contains("build"));
         assert!(command.contains("--source-set main"));
     }
@@ -1046,6 +1110,17 @@ mod tests {
 
         assert!(outcome.ok);
         let commands = runner.commands.borrow();
+        #[cfg(target_os = "windows")]
+        {
+            assert_eq!(commands[0].program, PathBuf::from("pwsh"));
+            assert_eq!(&commands[0].args[0..2], ["-NoProfile", "-File"]);
+            assert!(commands[0].args[2].contains("run-v8-runner.ps1"));
+            assert_eq!(
+                commands[0].args[3..],
+                ["build", "--full-rebuild", "--source-set", "main"]
+            );
+        }
+        #[cfg(not(target_os = "windows"))]
         assert_eq!(
             commands[0].args,
             vec!["build", "--full-rebuild", "--source-set", "main"]
@@ -1229,7 +1304,7 @@ mod tests {
             .unwrap();
 
         let command = outcome.command.unwrap().join(" ");
-        assert!(command.contains("run-bsl-analyzer.sh"));
+        assert!(command.contains(expected_launcher("run-bsl-analyzer")));
         assert!(command.contains("search"));
         assert!(command.contains("--query"));
         assert!(command.contains("ОбщийМодуль"));
@@ -1256,7 +1331,7 @@ mod tests {
             .unwrap();
 
         let command = outcome.command.unwrap().join(" ");
-        assert!(command.contains("run-bsl-analyzer.sh"));
+        assert!(command.contains(expected_launcher("run-bsl-analyzer")));
         assert!(command.contains("search"));
         assert!(command.contains("--query"));
         assert!(command.contains("ОбработкаПроведения"));
@@ -1347,7 +1422,7 @@ mod tests {
             .unwrap();
 
         let command = outcome.command.unwrap().join(" ");
-        assert!(command.contains("run-bsl-analyzer.sh"));
+        assert!(command.contains(expected_launcher("run-bsl-analyzer")));
         assert!(command.contains("analyze"));
         assert!(command.contains("--source-dir src"));
     }
@@ -1399,6 +1474,14 @@ mod tests {
                 .unwrap();
 
         assert!(!outcome.ok);
+        #[cfg(target_os = "windows")]
+        {
+            let commands = runner.commands.borrow();
+            assert_eq!(commands[0].program, PathBuf::from("pwsh"));
+            assert_eq!(&commands[0].args[0..2], ["-NoProfile", "-File"]);
+            assert!(commands[0].args[2].contains("run-v8-runner.ps1"));
+            assert_eq!(commands[0].args[3], "build");
+        }
         assert_eq!(outcome.stdout.as_deref(), Some("partial stdout"));
         assert_eq!(outcome.stderr.as_deref(), Some("failure stderr"));
         assert!(outcome.errors.contains(&"failure stderr".to_string()));
@@ -1561,6 +1644,14 @@ mod tests {
         }
     }
 
+    fn expected_launcher(stem: &str) -> String {
+        if cfg!(target_os = "windows") {
+            format!("{stem}.ps1")
+        } else {
+            format!("{stem}.sh")
+        }
+    }
+
     fn temp_context(name: &str) -> WorkspaceContext {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -1582,7 +1673,9 @@ mod tests {
         fs::create_dir_all(plugin_root.join("skills")).unwrap();
         fs::create_dir_all(plugin_root.join("scripts")).unwrap();
         fs::write(plugin_root.join("scripts").join("run-bsl-analyzer.sh"), "").unwrap();
+        fs::write(plugin_root.join("scripts").join("run-bsl-analyzer.ps1"), "").unwrap();
         fs::write(plugin_root.join("scripts").join("run-rlm-bsl-index.sh"), "").unwrap();
+        fs::write(plugin_root.join("scripts").join("run-rlm-bsl-index.ps1"), "").unwrap();
     }
 
     fn create_rlm_search_db(db_path: &PathBuf) {
