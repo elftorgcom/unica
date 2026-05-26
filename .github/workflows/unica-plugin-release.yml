@@ -181,6 +181,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.zip" \
             --clobber
@@ -197,7 +198,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
+          gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
 
       - name: Skip release creation for branches
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
@@ -232,6 +233,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
             dist/install-unica.sh \
             dist/install-unica.ps1 \
             --clobber
