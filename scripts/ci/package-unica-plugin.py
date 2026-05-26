@@ -196,12 +196,8 @@ def write_target_mcp(source_path: Path, dest_path: Path, *, target: str | None) 
     data = json.loads(source_path.read_text(encoding="utf-8"))
     if target == "win-x64":
         server = data["mcpServers"][PLUGIN_ID]
-        server["command"] = "pwsh"
-        server["args"] = [
-            "-NoProfile",
-            "-File",
-            f"./plugins/{PLUGIN_ID}/scripts/run-unica.ps1",
-        ]
+        server["command"] = f"./plugins/{PLUGIN_ID}/bin/win-x64/unica.exe"
+        server["args"] = []
 
     dest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
