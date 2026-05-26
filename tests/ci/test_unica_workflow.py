@@ -50,7 +50,7 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "python -m json.tool plugins/unica/third-party/manifest.json >/dev/null",
             "bash -n plugins/unica/scripts/*.sh",
             "Check PowerShell launchers",
-            "pwsh -NoProfile -Command",
+            "shell: pwsh",
             "plugins/unica/scripts/*.ps1",
             "System.Management.Automation.Language.Parser]::ParseFile",
             "cargo fmt --all -- --check",
@@ -78,7 +78,7 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "dist/install-unica.ps1",
             "Smoke Windows package MCP launcher",
             "unica-codex-marketplace-win-x64.zip",
-            "pwsh -NoProfile -Command",
+            "shell: pwsh",
             "run-unica.ps1",
         ]
 
