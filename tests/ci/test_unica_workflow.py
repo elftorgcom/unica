@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "unica-plugin-release.yml"
+INSTALL_UNICA_PS1 = REPO_ROOT / "scripts" / "install-unica.ps1"
 
 
 class UnicaWorkflowGuardrailTests(unittest.TestCase):
@@ -93,6 +94,20 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             "--data-binary @\"${asset}\"",
             "shell: pwsh",
             "run-unica.ps1",
+        ]
+
+        for token in required_tokens:
+            with self.subTest(token=token):
+                self.assertIn(token, text)
+
+    def test_windows_installer_copies_marketplace_contents(self) -> None:
+        text = INSTALL_UNICA_PS1.read_text(encoding="utf-8")
+        required_tokens = [
+            'Join-Path $marker.DirectoryName "..\\.."',
+            "New-Item -ItemType Directory -Force -Path $marketplaceDir",
+            "Get-ChildItem -LiteralPath $extractedMarketplaceDir -Force",
+            "Copy-Item -Destination $marketplaceDir -Recurse -Force",
+            'Join-Path $marketplaceDir "plugins\\unica\\scripts\\run-unica.ps1"',
         ]
 
         for token in required_tokens:

@@ -82,7 +82,7 @@ function Find-MarketplaceRoot {
     if (-not $marker) {
         throw "Downloaded archive does not contain .agents/plugins/marketplace.json"
     }
-    return (Resolve-Path (Join-Path $marker.DirectoryName "..\..\..")).Path
+    return (Resolve-Path (Join-Path $marker.DirectoryName "..\..")).Path
 }
 
 function Read-PluginVersion {
@@ -214,8 +214,9 @@ try {
     $extractedMarketplaceDir = Find-MarketplaceRoot $extractDir
     $marketplaceDir = Join-Path $codexHome "marketplaces\$marketplaceName"
     Remove-Item -LiteralPath $marketplaceDir -Recurse -Force -ErrorAction SilentlyContinue
-    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $marketplaceDir) | Out-Null
-    Copy-Item -LiteralPath $extractedMarketplaceDir -Destination $marketplaceDir -Recurse
+    New-Item -ItemType Directory -Force -Path $marketplaceDir | Out-Null
+    Get-ChildItem -LiteralPath $extractedMarketplaceDir -Force |
+        Copy-Item -Destination $marketplaceDir -Recurse -Force
 
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-v8-runner.ps1") config init --help | Out-Null
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-unica.ps1") --help | Out-Null
