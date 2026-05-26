@@ -94,6 +94,30 @@ function Read-PluginVersion {
     return [string] $plugin.version
 }
 
+function Repair-WindowsMcpLauncher {
+    param(
+        [string] $MarketplaceDir,
+        [string] $Target
+    )
+    if ($Target -ne "win-x64") {
+        return
+    }
+
+    $mcpPath = Join-Path $MarketplaceDir "plugins\unica\.mcp.json"
+    $binaryPath = Join-Path $MarketplaceDir "plugins\unica\bin\win-x64\unica.exe"
+    if (-not (Test-Path -LiteralPath $mcpPath)) {
+        throw "Cannot repair Unica MCP launcher because $mcpPath is missing."
+    }
+    if (-not (Test-Path -LiteralPath $binaryPath)) {
+        throw "Cannot repair Unica MCP launcher because $binaryPath is missing."
+    }
+
+    $mcp = Get-Content -LiteralPath $mcpPath -Raw | ConvertFrom-Json
+    $mcp.mcpServers.unica.command = "./plugins/unica/bin/win-x64/unica.exe"
+    $mcp.mcpServers.unica.args = @()
+    $mcp | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpPath -Encoding UTF8
+}
+
 function Enable-CodexPlugin {
     param(
         [string] $CodexHome,
@@ -218,6 +242,7 @@ try {
     Get-ChildItem -LiteralPath $extractedMarketplaceDir -Force |
         Copy-Item -Destination $marketplaceDir -Recurse -Force
 
+    Repair-WindowsMcpLauncher $marketplaceDir $target
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-v8-runner.ps1") config init --help | Out-Null
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-unica.ps1") --help | Out-Null
 

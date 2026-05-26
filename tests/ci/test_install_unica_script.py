@@ -51,6 +51,13 @@ class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
                 self.assertIn("db-auth-check", text)
                 self.assertNotIn("workspace-init", text)
 
+    def test_windows_installer_repairs_mcp_launcher_to_bundled_binary(self) -> None:
+        text = PS_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("Repair-WindowsMcpLauncher $marketplaceDir $target", text)
+        self.assertIn("./plugins/unica/bin/win-x64/unica.exe", text)
+        self.assertNotIn("./plugins/unica/scripts/run-unica.ps1`\"", text)
+
 
 @unittest.skipIf(os.name == "nt", "install-unica.sh URL checks run on POSIX CI")
 class InstallUnicaScriptTests(unittest.TestCase):
