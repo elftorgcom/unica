@@ -42,9 +42,9 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             '- "release/windows-first-0.4.2"',
             'tags:',
             '- "v*"',
-            "uses: actions/checkout@v4",
-            "uses: actions/setup-python@v5",
-            'python-version: "3.12"',
+            "Checkout repository",
+            'git fetch --depth=1 origin "${GITHUB_REF}"',
+            "Check Python",
             "python -m pip install -r tests/ci/requirements.txt",
             "Set up Rust",
             "rustup toolchain install stable --profile minimal",
@@ -69,11 +69,14 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, text)
 
-    def test_build_tools_waits_for_source_verification_and_sets_up_rust(self) -> None:
+    def test_package_job_waits_for_source_verification_and_sets_up_rust(self) -> None:
         text = self.workflow_text()
-        self.assertIn("build-tools:", text)
+        self.assertIn("package:", text)
         self.assertIn("needs: verify-source", text)
         self.assertIn("rustup toolchain install stable --profile minimal", text)
+        self.assertIn("Build target bundle", text)
+        self.assertIn("--out-dir \".build/tool-artifacts/unica-tools-${{ matrix.target }}\"", text)
+        self.assertIn("Assemble marketplace package", text)
         self.assertIn("python scripts/ci/build-unica-tools.py", text)
 
     def test_release_workflow_publishes_both_installers_and_smokes_windows_package(self) -> None:
@@ -81,8 +84,6 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
         required_tokens = [
             "cp scripts/install-unica.sh dist/install-unica.sh",
             "cp scripts/install-unica.ps1 dist/install-unica.ps1",
-            "dist/install-unica.sh",
-            "dist/install-unica.ps1",
             "Smoke Windows package MCP launcher",
             "unica-codex-marketplace-win-x64.zip",
             'GH_TOKEN: ${{ github.token }}',
