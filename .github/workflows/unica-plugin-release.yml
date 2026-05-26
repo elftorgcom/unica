@@ -17,6 +17,9 @@ on:
       - "tests/fixtures/**"
       - "spec/**"
   push:
+    branches:
+      - "main"
+      - "release/windows-first-0.4.2"
     tags:
       - "v*"
 

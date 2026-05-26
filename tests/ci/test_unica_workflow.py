@@ -37,6 +37,11 @@ class UnicaWorkflowGuardrailTests(unittest.TestCase):
         text = self.workflow_text()
         required_tokens = [
             "verify-source:",
+            'branches:',
+            '- "main"',
+            '- "release/windows-first-0.4.2"',
+            'tags:',
+            '- "v*"',
             "uses: actions/checkout@v4",
             "uses: actions/setup-python@v5",
             'python-version: "3.12"',
