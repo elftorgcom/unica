@@ -179,9 +179,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF}" in
-            refs/tags/*) ;;
-            *) echo "Skipping release asset upload for ${GITHUB_REF}"; exit 0 ;;
+          case "${GITHUB_REF_NAME}" in
+            v*) ;;
+            *) echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
           esac
           gh release upload "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
@@ -200,9 +200,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF}" in
-            refs/tags/*) ;;
-            *) echo "Skipping release creation for ${GITHUB_REF}"; exit 0 ;;
+          case "${GITHUB_REF_NAME}" in
+            v*) ;;
+            *) echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
           esac
           gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
 
@@ -233,9 +233,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF}" in
-            refs/tags/*) ;;
-            *) echo "Skipping installer upload for ${GITHUB_REF}"; exit 0 ;;
+          case "${GITHUB_REF_NAME}" in
+            v*) ;;
+            *) echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
           esac
           gh release upload "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
