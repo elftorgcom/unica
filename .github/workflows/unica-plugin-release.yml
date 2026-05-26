@@ -178,15 +178,24 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_REF: ${{ github.event.ref }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
           RELEASE_TAG="$(python - <<'PY'
-          import json
           import os
 
-          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
-              ref = json.load(event_file).get("ref", "")
-          if ref.startswith("refs/tags/"):
-              print(ref[len("refs/tags/"):])
+          for value in (
+              os.environ.get("EVENT_REF", ""),
+              os.environ.get("GITHUB_REF", ""),
+              os.environ.get("EVENT_REF_NAME", ""),
+              os.environ.get("GITHUB_REF_NAME", ""),
+          ):
+              if value.startswith("refs/tags/v"):
+                  print(value[len("refs/tags/"):])
+                  break
+              if value.startswith("v"):
+                  print(value)
+                  break
           PY
           )"
           if [ -z "${RELEASE_TAG}" ]; then
@@ -209,21 +218,33 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_REF: ${{ github.event.ref }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
           RELEASE_TAG="$(python - <<'PY'
-          import json
           import os
 
-          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
-              ref = json.load(event_file).get("ref", "")
-          if ref.startswith("refs/tags/"):
-              print(ref[len("refs/tags/"):])
+          for value in (
+              os.environ.get("EVENT_REF", ""),
+              os.environ.get("GITHUB_REF", ""),
+              os.environ.get("EVENT_REF_NAME", ""),
+              os.environ.get("GITHUB_REF_NAME", ""),
+          ):
+              if value.startswith("refs/tags/v"):
+                  print(value[len("refs/tags/"):])
+                  break
+              if value.startswith("v"):
+                  print(value)
+                  break
           PY
           )"
           if [ -z "${RELEASE_TAG}" ]; then
-            echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"
-            exit 0
+            case "${GITHUB_REF_NAME}" in
+              main|release/*) echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
+              *) echo "Could not resolve release tag from EVENT_REF=${EVENT_REF}, EVENT_REF_NAME=${EVENT_REF_NAME}, GITHUB_REF=${GITHUB_REF}, GITHUB_REF_NAME=${GITHUB_REF_NAME}"; exit 1 ;;
+            esac
           fi
+          echo "Publishing release ${RELEASE_TAG}"
           gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --title "${RELEASE_TAG}" --notes "Release ${RELEASE_TAG}"
 
   installer:
@@ -252,15 +273,24 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_REF: ${{ github.event.ref }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
           RELEASE_TAG="$(python - <<'PY'
-          import json
           import os
 
-          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
-              ref = json.load(event_file).get("ref", "")
-          if ref.startswith("refs/tags/"):
-              print(ref[len("refs/tags/"):])
+          for value in (
+              os.environ.get("EVENT_REF", ""),
+              os.environ.get("GITHUB_REF", ""),
+              os.environ.get("EVENT_REF_NAME", ""),
+              os.environ.get("GITHUB_REF_NAME", ""),
+          ):
+              if value.startswith("refs/tags/v"):
+                  print(value[len("refs/tags/"):])
+                  break
+              if value.startswith("v"):
+                  print(value)
+                  break
           PY
           )"
           if [ -z "${RELEASE_TAG}" ]; then
