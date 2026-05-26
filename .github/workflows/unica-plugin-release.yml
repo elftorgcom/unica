@@ -179,11 +179,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF_NAME}" in
-            v*) ;;
-            *) echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
-          esac
-          gh release upload "${GITHUB_REF_NAME}" \
+          RELEASE_TAG="$(python - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
+              ref = json.load(event_file).get("ref", "")
+          if ref.startswith("refs/tags/"):
+              print(ref[len("refs/tags/"):])
+          PY
+          )"
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
+            exit 0
+          fi
+          gh release upload "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.zip" \
@@ -200,11 +210,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF_NAME}" in
-            v*) ;;
-            *) echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
-          esac
-          gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
+          RELEASE_TAG="$(python - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
+              ref = json.load(event_file).get("ref", "")
+          if ref.startswith("refs/tags/"):
+              print(ref[len("refs/tags/"):])
+          PY
+          )"
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"
+            exit 0
+          fi
+          gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --title "${RELEASE_TAG}" --notes "Release ${RELEASE_TAG}"
 
   installer:
     name: Publish installer script
@@ -233,11 +253,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          case "${GITHUB_REF_NAME}" in
-            v*) ;;
-            *) echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
-          esac
-          gh release upload "${GITHUB_REF_NAME}" \
+          RELEASE_TAG="$(python - <<'PY'
+          import json
+          import os
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as event_file:
+              ref = json.load(event_file).get("ref", "")
+          if ref.startswith("refs/tags/"):
+              print(ref[len("refs/tags/"):])
+          PY
+          )"
+          if [ -z "${RELEASE_TAG}" ]; then
+            echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
+            exit 0
+          fi
+          gh release upload "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             dist/install-unica.sh \
             dist/install-unica.ps1 \
