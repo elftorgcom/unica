@@ -175,11 +175,14 @@ jobs:
           }
 
       - name: Publish release assets
-        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          case "${GITHUB_REF}" in
+            refs/tags/*) ;;
+            *) echo "Skipping release asset upload for ${GITHUB_REF}"; exit 0 ;;
+          esac
           gh release upload "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
@@ -193,16 +196,15 @@ jobs:
 
     steps:
       - name: Create release
-        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          case "${GITHUB_REF}" in
+            refs/tags/*) ;;
+            *) echo "Skipping release creation for ${GITHUB_REF}"; exit 0 ;;
+          esac
           gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1 || gh release create "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
-
-      - name: Skip release creation for branches
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: echo "Release creation is only needed for tag runs."
 
   installer:
     name: Publish installer script
@@ -227,11 +229,14 @@ jobs:
           cp scripts/install-unica.ps1 dist/install-unica.ps1
 
       - name: Publish installer asset
-        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          case "${GITHUB_REF}" in
+            refs/tags/*) ;;
+            *) echo "Skipping installer upload for ${GITHUB_REF}"; exit 0 ;;
+          esac
           gh release upload "${GITHUB_REF_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
             dist/install-unica.sh \
