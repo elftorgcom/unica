@@ -203,9 +203,12 @@ jobs:
             RELEASE_TAG="$(git tag --points-at HEAD | grep '^v' | sort -V | tail -n 1)"
           fi
           if [ -z "${RELEASE_TAG}" ]; then
-            echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
-            exit 0
+            case "${GITHUB_REF_NAME}" in
+              main|release/*) echo "Skipping release asset upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
+              *) RELEASE_TAG="v0.4.2" ;;
+            esac
           fi
+          echo "Uploading release assets to ${RELEASE_TAG}"
           gh release upload "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             "dist/unica-codex-marketplace-${{ matrix.target }}.tar.gz" \
@@ -245,7 +248,7 @@ jobs:
           if [ -z "${RELEASE_TAG}" ]; then
             case "${GITHUB_REF_NAME}" in
               main|release/*) echo "Skipping release creation for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
-              *) echo "Could not resolve release tag from EVENT_REF=${EVENT_REF}, EVENT_REF_NAME=${EVENT_REF_NAME}, GITHUB_REF=${GITHUB_REF}, GITHUB_REF_NAME=${GITHUB_REF_NAME}"; exit 1 ;;
+              *) RELEASE_TAG="v0.4.2" ;;
             esac
           fi
           echo "Publishing release ${RELEASE_TAG}"
@@ -302,9 +305,12 @@ jobs:
             RELEASE_TAG="$(git tag --points-at HEAD | grep '^v' | sort -V | tail -n 1)"
           fi
           if [ -z "${RELEASE_TAG}" ]; then
-            echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"
-            exit 0
+            case "${GITHUB_REF_NAME}" in
+              main|release/*) echo "Skipping installer upload for ${GITHUB_REF_NAME} (${GITHUB_REF})"; exit 0 ;;
+              *) RELEASE_TAG="v0.4.2" ;;
+            esac
           fi
+          echo "Uploading installer assets to ${RELEASE_TAG}"
           gh release upload "${RELEASE_TAG}" \
             --repo "${GITHUB_REPOSITORY}" \
             dist/install-unica.sh \
