@@ -1,196 +1,112 @@
 # Unica Codex Plugin
 
-Unica is a Codex plugin for day-to-day 1C:Enterprise development work.
+Unica - плагин Codex для практической 1С-разработки.
 
-The public skills model developer operations, not infrastructure tools:
+Он даёт Codex навыки для работы с конфигурациями, расширениями, формами,
+ролями, СКД, MXL, внешними обработками и отчетами, BSL-кодом и runtime-задачами
+через v8-runner.
 
-- create, inspect, edit, validate, compile, dump, and load 1C metadata;
-- build, dump, and publish external processing/report source sets (`EPF`/`ERF`) through v8-runner MCP workflows;
-- run v8-runner database/build/runtime workflows through MCP `unica`;
-- work with forms, roles, SKD, MXL, subsystems, command interfaces, help, templates, and autonomous web-client debug;
-- search, review, diagnose, test, and analyze BSL code inside those workflows.
-- bootstrap a new 1C repository workspace with `v8project.yaml`.
+## Windows-first в 0.4.2
 
-Bundled tooling, wrappers, MCP server names, checksums, and third-party notices are internal package infrastructure. Project configuration is `v8project.yaml` / `V8TR_CONFIG`; database and build workflows should use the `v8-runner` skill, which calls MCP `unica.runtime.execute`. See `references/tooling/internal-package.md` when maintaining the plugin itself.
-
-## Skills
-
-The `skills/` directory contains operation skills and scenario references for 1C developer workflows. Examples:
-
-- `cf-edit`, `cf-info`, `cf-init`, `cf-validate`
-- `cfe-init`, `cfe-borrow`, `cfe-diff`, `cfe-patch-method`, `cfe-validate`
-- `v8-runner`, `db-auth-check`
-- `epf-bsp-init`, `epf-bsp-add-command` for BSP registration helpers; EPF/ERF build and dump workflows live in `v8-runner`
-- `form-add`, `form-edit`, `form-info`, `form-compile`, `form-validate`, `form-remove`
-- `meta-compile`, `meta-edit`, `meta-info`, `meta-remove`, `meta-validate`
-- `mxl-*`, `role-*`, `skd-*`, `subsystem-*`, `interface-*`, `template-*`, `web-test`, `img-grid`
-- `code-search`, `code-diagnostics`, `code-review`, `query-optimize`, `test-authoring`
-- `api-design`, `platform-help`, `bsp-patterns`, `integration-implement`, `autonomous-server`, `log-analysis`
-- `background-jobs`, `data-exchange`, `db-performance`, `security-auth-crypto`, `data-separation`, `release-support`
-
-## Local Codex Install
-
-The source tree is for plugin and skill development. It does not commit bundled
-tool binaries, so local MCP wrappers that need `bsl-analyzer`, `v8-runner`, or
-`rlm-*` only work from a generated marketplace archive.
-
-Register the repo-local marketplace from the repository root when you only need
-to inspect skills and metadata:
-
-```sh
-codex plugin marketplace add "$PWD"
-```
-
-Enable `unica@unica` in Codex. The plugin owns its MCP registrations through `.mcp.json`; do not add these servers separately with global `codex mcp add`.
-
-To check what a fresh Codex session sees:
-
-```sh
-codex debug prompt-input 'test'
-```
-
-## Local Debug Install
-
-From this repository, one command builds a fully working local Unica package for
-the current machine, installs it into Codex as `unica-local`, and verifies a
-fresh Codex prompt:
-
-```sh
-scripts/dev/install-local-unica.sh
-```
-
-The script builds only the current host target, writes the generated marketplace
-under `.build/local-codex-unica/package/marketplace`, removes any previous
-`unica-local` marketplace, adds the new one, validates the bundled MCP metadata
-and launchers, and checks that fresh Codex sees `Unica`, `v8-runner`, and
-`db-auth-check`.
-
-Useful development flags:
-
-```sh
-scripts/dev/install-local-unica.sh --skip-build
-scripts/dev/install-local-unica.sh --skip-install
-scripts/dev/install-local-unica.sh --marketplace-name unica-dev
-```
-
-## Support Matrix
-
-| Area | Windows | macOS arm64 | Notes |
-| --- | --- | --- | --- |
-| Operation skills and PowerShell scripts | Primary path | Available when PowerShell is installed | The source skills are Windows-first because 1C Designer automation is Windows-first. |
-| Python script ports | Available with Python | Available with `python3` | Used for XML/metadata operations where ports exist. |
-| Bundled binaries | Built by GitHub Actions into `bin/win-x64/` | Built by GitHub Actions into `bin/darwin-arm64/` | Linux x64 is built into `bin/linux-x64/`; each release artifact carries one target-specific manifest. Binaries are ignored in source control. |
-| MCP local tools | Native PowerShell 7 (`pwsh`) launchers are the runtime path for packaged Windows binaries | Shell-first stdio MCP orchestrator is supported on macOS/Linux | Windows does not require WSL, Git Bash, or MSYS2 at runtime. External standards data is reached through the internal standards adapter. |
-| 1C platform operations | Requires local 1C platform | Requires local 1C platform or compatible tooling | Skills resolve project/database context from `v8project.yaml` when present. |
-
-## Bundled Tools
-
-Release packages include pinned binaries for `darwin-arm64`, `linux-x64`, and
-`win-x64`. The dependency lock is `third-party/tools.lock.json`; do not duplicate
-versions in CI scripts or docs.
-
-- `bsl-analyzer`
-- `v8-runner`
-- `rlm-tools-bsl`
-- `rlm-bsl-index`
-- `unica`
-- remote v8std MCP endpoint: `https://ai.v8std.ru/mcp`
-
-Every bundled binary launch goes through a wrapper:
-
-- `scripts/run-tool.sh` for macOS/Linux shell environments;
-- `scripts/run-tool.ps1` as the primary Windows PowerShell launcher;
-- `scripts/run-unica.ps1` as the public Windows MCP entrypoint for the packaged
-  `unica` stdio server;
-- per-tool shell and PowerShell wrappers used by the `unica` orchestrator as
-  internal adapters.
-
-Wrappers read `third-party/manifest.json`, check the host target, verify SHA-256, and then execute the pinned binary. This prevents Codex from accidentally using a global tool of another version.
-
-Windows runtime prerequisites are Codex CLI, PowerShell 7 (`pwsh`), the local 1C
-platform for real 1C operations, and network access for remote standards lookup.
-The Windows package does not require WSL, Git Bash, or MSYS2. `rlm-tools-bsl`
-`service.json` discovery failures and remote standards endpoint failures should
-be treated as runtime configuration or network issues.
-
-## Release Pipeline
-
-`.github/workflows/unica-plugin-release.yml` builds the distributable marketplace package without committing generated binaries to the repository:
-
-1. read `third-party/tools.lock.json`;
-2. build `darwin-arm64`, `linux-x64`, and `win-x64` tool bundles;
-3. download pinned `bsl-analyzer` and `v8-runner` release assets from the lock;
-4. build `rlm-tools-bsl` and `rlm-bsl-index` with PyInstaller from the locked upstream source tag;
-5. generate a target-specific `third-party/manifest.json` with SHA-256 checksums;
-6. write official marketplace metadata with visible display name `Unica` and plugin id `unica`;
-7. publish platform-specific archives such as `unica-codex-marketplace-darwin-arm64.tar.gz`, `unica-codex-marketplace-linux-x64.tar.gz`, and `unica-codex-marketplace-win-x64.zip` as workflow artifacts and, on tags, GitHub Release assets;
-8. publish `install-unica.sh` as a release asset for one-command installation.
-
-The tool build script requires Python 3.10 or newer; CI uses Python 3.12 and
-creates a local venv under `.build/` for Python-packaged tools.
-
-Use the generated marketplace archive as the candidate package for the official Codex store. Official distribution must use GitHub Actions package artifacts, not checked-in generated binaries.
-
-## License
-
-Unica is licensed under `LGPL-3.0-or-later`. See `LICENSE`.
-
-## MCP Server
-
-`.mcp.json` declares exactly one public MCP server:
-
-- `unica`
-
-`unica` owns workspace discovery, cache coordination, and adapter orchestration. Build/runtime tooling, code analysis, standards lookup, and XML/JSON DSL fallback scripts are private implementation details behind this one MCP contract.
-
-## Verification
-
-From the repository root:
-
-```sh
-python3.12 -m unittest discover -s tests/ci
-python3.12 -m py_compile scripts/ci/*.py tests/ci/*.py
-python3.12 -m json.tool plugins/unica/.codex-plugin/plugin.json >/dev/null
-python3.12 -m json.tool plugins/unica/.mcp.json >/dev/null
-python3.12 -m json.tool plugins/unica/third-party/tools.lock.json >/dev/null
-python3.12 -m json.tool plugins/unica/third-party/manifest.json >/dev/null
-bash -n plugins/unica/scripts/*.sh
-cargo fmt --all -- --check
-cargo clippy --package unica-coder --all-targets --all-features -- -D warnings
-cargo test --package unica-coder
-rg 'references/(cc-1c-skills|ai-rules-1c)|Claude|[.]claude|Anthropic' plugins/unica/references plugins/unica/skills
-git diff --check
-codex debug prompt-input 'test'
-```
-
-For generated marketplace packages on macOS arm64, extract the archive and run:
-
-```sh
-plugins/unica/scripts/run-bsl-analyzer.sh --version
-plugins/unica/scripts/run-v8-runner.sh config init --help
-plugins/unica/scripts/run-rlm-tools-bsl.sh --version
-plugins/unica/scripts/run-rlm-bsl-index.sh --version
-plugins/unica/scripts/run-unica.sh --help
-```
-
-For generated `win-x64` marketplace packages, extract the archive and run from
-native PowerShell 7:
+Windows-пакет работает нативно через PowerShell 7:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 bsl-analyzer --version
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 v8-runner config init --help
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 rlm-tools-bsl --version
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 rlm-bsl-index --version
 pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
 ```
 
-## Updating Pinned Tools
+Для Windows runtime не нужны:
 
-Do not replace binaries in the repository. They are generated by CI.
+- WSL;
+- Git Bash;
+- MSYS2;
+- `bash` / `sh`;
+- любое другое POSIX shell-окружение.
 
-For every tool update:
+Это относится и к MCP-сценариям: публичный stdio MCP-сервер запускается через
+`run-unica.ps1`, а внутренние инструменты вызываются через PowerShell wrappers.
 
-1. update pinned versions, tags, commits, upstream URLs, licenses, and target asset names in `third-party/tools.lock.json`;
-2. run the GitHub Actions release workflow;
-3. inspect the generated `third-party/manifest.json` inside the marketplace artifact;
-4. run JSON validation, script syntax checks, binary version/help checks, MCP smoke tests, and fresh Codex prompt-input verification against the generated artifact.
+## MCP
+
+Публичный MCP-сервер один:
+
+- `unica`
+
+`.mcp.json` для Windows-пакета указывает на:
+
+```json
+{
+  "command": "pwsh",
+  "args": ["-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1"]
+}
+```
+
+Остальные инструменты (`v8-runner`, `bsl-analyzer`, `rlm-tools-bsl`,
+`rlm-bsl-index`) - внутренние adapters за границей MCP `unica`.
+
+## Навыки
+
+Основные группы skills:
+
+- `cf-*`, `cfe-*` - конфигурации и расширения;
+- `meta-*`, `form-*`, `role-*`, `skd-*`, `mxl-*` - объекты, формы, роли, СКД и макеты;
+- `epf-*` - внешние обработки и отчеты;
+- `v8-runner`, `db-auth-check` - runtime, базы, сборка, загрузка;
+- `code-search`, `code-diagnostics`, `code-review` - BSL-код;
+- `platform-help`, `bsp-patterns`, `query-optimize`, `test-authoring` - справка, БСП, запросы и тесты.
+
+## Установка
+
+Windows:
+
+```powershell
+$env:UNICA_REPO = "elftorgcom/unica"
+irm https://github.com/elftorgcom/unica/releases/download/v0.4.2/install-unica.ps1 -OutFile install-unica.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\install-unica.ps1 -Version v0.4.2
+```
+
+Linux/macOS:
+
+```sh
+curl -fsSL https://github.com/elftorgcom/unica/releases/download/v0.4.2/install-unica.sh | sh -s -- --version v0.4.2
+```
+
+## Проверка пакета
+
+После распаковки `unica-codex-marketplace-win-x64.zip`:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-bsl-analyzer.ps1 --version
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-v8-runner.ps1 --help
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
+```
+
+MCP smoke:
+
+```powershell
+'{"jsonrpc":"2.0","id":1,"method":"tools/list"}' |
+  pwsh -NoProfile -File plugins/unica/scripts/run-unica.ps1
+```
+
+## Внутренние инструменты
+
+Release-пакет содержит pinned binaries для целевой платформы. Они не лежат в
+исходниках репозитория и собираются в GitHub Actions.
+
+Запуск идёт через wrappers:
+
+- `scripts/run-tool.ps1` - основной Windows wrapper;
+- `scripts/run-unica.ps1` - публичный Windows MCP entrypoint;
+- `scripts/run-tool.sh` и shell wrappers - Linux/macOS runtime.
+
+Wrappers читают `third-party/manifest.json`, проверяют целевую платформу и
+SHA-256 перед запуском бинарника.
+
+## Поддержка
+
+Подробности для сопровождающих:
+
+- `references/tooling/internal-package.md`
+- `third-party/tools.lock.json`
+- `.github/workflows/unica-plugin-release.yml`
+
+Лицензия: `LGPL-3.0-or-later`.

@@ -1,109 +1,91 @@
-# Unica
+# Unica для Codex
 
-Unica - это плагин для Codex, который помогает работать с проектами 1С:Предприятие.
+Windows-first форк плагина Unica для задач 1С:Предприятия в Codex.
 
-Обычным языком: репозиторий содержит набор инструкций, сценариев и подключаемых инструментов, чтобы Codex мог выполнять типовые задачи 1С-разработчика: создавать объекты конфигурации, собирать внешние обработки и отчеты, обновлять базы, запускать проверки и искать код в больших 1С-проектах.
+Unica добавляет в Codex навыки и MCP-инструменты для повседневной 1С-разработки:
+метаданные, формы, роли, СКД, MXL, EPF/ERF, сборка и загрузка конфигураций,
+поиск и диагностика BSL-кода, работа с runtime-сценариями через v8-runner.
 
-## Что в этой репе
+## Что изменено в этом форке
 
-- `plugins/unica/skills/` - прикладные навыки Codex: формы, метаданные, EPF/ERF, базы, роли, СКД, веб-публикация и другие задачи 1С.
-- `plugins/unica/.mcp.json` - MCP-подключения для поиска кода, работы с инструментами 1С и справочными материалами.
-- `plugins/unica/scripts/` - безопасные запускатели bundled-инструментов.
-- `plugins/unica/third-party/tools.lock.json` - единый список версий внешних инструментов.
-- `.github/workflows/unica-plugin-release.yml` - сборка готового пакета плагина для установки.
+- Выпуск `0.4.2` адаптирован под Windows-first runtime.
+- Windows-пакет запускается через PowerShell 7 (`pwsh`).
+- Для MCP-сценариев на Windows больше не нужны `bash`, `sh`, WSL, Git Bash,
+  MSYS2 или другое POSIX shell-окружение.
+- Единственный публичный MCP-сервер по-прежнему называется `unica`.
+- Внутренние бинарные инструменты запускаются только через checksum-wrapper'ы.
+- GitHub Actions собирает и публикует release assets для `win-x64`, `linux-x64`
+  и `darwin-arm64`, а также установщики `install-unica.ps1` и
+  `install-unica.sh`.
 
-Исходники в репозитории не хранят готовые бинарные утилиты. Они собираются в GitHub Actions и попадают в готовый marketplace-пакет.
+## Быстрая установка на Windows
 
-## Для кого
+Требования:
 
-- Для 1С-разработчиков, которые хотят использовать Codex как помощника по реальным задачам разработки.
-- Для тех, кто поддерживает или расширяет сам плагин Unica.
-- Для команд, которым нужен воспроизводимый набор 1С-инструментов внутри Codex.
+- Windows x64;
+- Codex CLI;
+- PowerShell 7+ (`pwsh`);
+- платформа 1С нужна только для реальных операций с базами и конфигурациями.
 
-## Установка
-
-Одна команда скачивает installer из последнего GitHub Release, определяет
-платформу, скачивает нужный пакет Unica и устанавливает его в Codex:
-
-```sh
-curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh
-```
-
-Для установки конкретного релиза:
-
-```sh
-curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh -s -- --version v0.4.2
-```
-
-Release assets собираются отдельно под платформы:
-
-- `unica-codex-marketplace-darwin-arm64.tar.gz`
-- `unica-codex-marketplace-linux-x64.tar.gz`
-- `unica-codex-marketplace-win-x64.zip`
-
-Installer выбирает нужный архив, регистрирует marketplace `unica-local`,
-обновляет cache Codex и включает `unica@unica-local`.
-
-### Windows-first runtime
-
-Windows package `unica-codex-marketplace-win-x64.zip` is designed to run from
-native PowerShell 7 (`pwsh`). It does not require WSL, Git Bash, MSYS2, or any
-other POSIX shell at runtime. The public MCP entrypoint for the packaged Windows
-plugin is:
+Установка из релиза форка:
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
+$env:UNICA_REPO = "elftorgcom/unica"
+irm https://github.com/elftorgcom/unica/releases/download/v0.4.2/install-unica.ps1 -OutFile install-unica.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\install-unica.ps1 -Version v0.4.2
 ```
 
-The public MCP contract is still a single stdio server named `unica`; other
-bundled tools are private adapters behind that server. For Windows smoke checks
-against an extracted package, use native PowerShell launchers:
+Установщик скачает `unica-codex-marketplace-win-x64.zip`, зарегистрирует
+marketplace `unica-local`, обновит cache Codex и включит `unica@unica-local`.
+
+## Проверка
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 unica --help
-pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
-codex debug prompt-input 'test'
+pwsh -NoProfile -ExecutionPolicy Bypass -File "$env:CODEX_HOME\marketplaces\unica-local\plugins\unica\scripts\run-unica.ps1" --help
+codex debug prompt-input "test"
 ```
 
-Runtime prerequisites are intentionally external: Codex CLI, PowerShell 7,
-local 1C platform binaries for real 1C operations, and network access for remote
-standards lookup. Failures in `rlm-tools-bsl` `service.json` discovery or the
-external standards endpoint are runtime configuration or network issues, not
-requirements to install WSL/Git Bash/MSYS2.
+В свежем prompt-input должны быть видны `Unica` и навыки вида
+`unica:v8-runner`, `unica:meta-compile`, `unica:epf-bsp-init`.
 
-Проверка:
+Проверка MCP без Codex:
 
-```sh
-codex debug prompt-input 'test'
+```powershell
+$server = "$env:CODEX_HOME\marketplaces\unica-local\plugins\unica\scripts\run-unica.ps1"
+'{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}' |
+  pwsh -NoProfile -File $server
 ```
 
-В выводе должны быть видны plugin `Unica` и навыки вида `unica:meta-compile`, `unica:v8-runner`, `unica:epf-bsp-init`.
+Ожидаемый ответ содержит `serverInfo.name = unica` и версию `0.4.2`.
 
-## Установка из исходников для разработки
+## Release assets
 
-Этот режим нужен, если вы меняете сам плагин:
+- `install-unica.ps1` - установщик для Windows.
+- `install-unica.sh` - установщик для Linux/macOS.
+- `unica-codex-marketplace-win-x64.zip` - основной Windows-пакет.
+- `unica-codex-marketplace-linux-x64.*`
+- `unica-codex-marketplace-darwin-arm64.*`
 
-```sh
-git clone https://github.com/IngvarConsulting/unica.git
+Страница релиза:
+
+<https://github.com/elftorgcom/unica/releases/tag/v0.4.2>
+
+## Для разработки
+
+```powershell
+git clone https://github.com/elftorgcom/unica.git
 cd unica
-scripts/dev/install-local-unica.sh
+python -m unittest discover -s tests/ci
 ```
 
-Скрипт соберет пакет под текущую машину из локальных исходников, установит его
-в Codex как `unica-local` и проверит свежую сессию через
-`codex debug prompt-input`.
+Основные файлы:
 
-## Что нужно для работы
+- `plugins/unica/skills/` - навыки Codex для 1С.
+- `plugins/unica/scripts/` - Windows PowerShell и shell launchers.
+- `plugins/unica/.mcp.json` - публичный MCP entrypoint `unica`.
+- `plugins/unica/third-party/tools.lock.json` - pinned версии внешних инструментов.
+- `.github/workflows/unica-plugin-release.yml` - сборка и публикация пакетов.
 
-- Установленный Codex CLI.
-- Для реальных операций с базами и конфигурациями - установленная платформа 1С.
-- Для Windows-сценариев и Windows MCP runtime - PowerShell 7 (`pwsh`).
-- Для macOS/Linux MCP-сценариев - shell-окружение.
+## Лицензия
 
-## Где смотреть детали
-
-- Техническое описание плагина: `plugins/unica/README.md`.
-- Внутренняя схема инструментов и сборки: `plugins/unica/references/tooling/internal-package.md`.
-- Список pinned-инструментов: `plugins/unica/third-party/tools.lock.json`.
-
-Официальная публикация в публичный каталог Codex будет отдельным шагом, когда OpenAI откроет self-serve публикацию плагинов. Сейчас репозиторий готовит воспроизводимый marketplace-пакет, который можно устанавливать как локальный или Git-backed marketplace.
+Unica распространяется по `LGPL-3.0-or-later`. См. `LICENSE`.
