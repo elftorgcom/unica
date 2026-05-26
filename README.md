@@ -32,7 +32,7 @@ curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/in
 Для установки конкретного релиза:
 
 ```sh
-curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh -s -- --version v0.4.1
+curl -fsSL https://github.com/IngvarConsulting/unica/releases/latest/download/install-unica.sh | sh -s -- --version v0.4.2
 ```
 
 Release assets собираются отдельно под платформы:
@@ -43,6 +43,33 @@ Release assets собираются отдельно под платформы:
 
 Installer выбирает нужный архив, регистрирует marketplace `unica-local`,
 обновляет cache Codex и включает `unica@unica-local`.
+
+### Windows-first runtime
+
+Windows package `unica-codex-marketplace-win-x64.zip` is designed to run from
+native PowerShell 7 (`pwsh`). It does not require WSL, Git Bash, MSYS2, or any
+other POSIX shell at runtime. The public MCP entrypoint for the packaged Windows
+plugin is:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
+```
+
+The public MCP contract is still a single stdio server named `unica`; other
+bundled tools are private adapters behind that server. For Windows smoke checks
+against an extracted package, use native PowerShell launchers:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 unica --help
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
+codex debug prompt-input 'test'
+```
+
+Runtime prerequisites are intentionally external: Codex CLI, PowerShell 7,
+local 1C platform binaries for real 1C operations, and network access for remote
+standards lookup. Failures in `rlm-tools-bsl` `service.json` discovery or the
+external standards endpoint are runtime configuration or network issues, not
+requirements to install WSL/Git Bash/MSYS2.
 
 Проверка:
 
@@ -70,7 +97,7 @@ scripts/dev/install-local-unica.sh
 
 - Установленный Codex CLI.
 - Для реальных операций с базами и конфигурациями - установленная платформа 1С.
-- Для Windows-сценариев - PowerShell.
+- Для Windows-сценариев и Windows MCP runtime - PowerShell 7 (`pwsh`).
 - Для macOS/Linux MCP-сценариев - shell-окружение.
 
 ## Где смотреть детали

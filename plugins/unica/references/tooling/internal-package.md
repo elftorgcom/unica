@@ -40,11 +40,15 @@ binary paths. This prevents accidental use of a globally installed tool with a
 different version.
 
 - `scripts/run-tool.sh <tool-name> [args...]` is the macOS/Linux launcher.
-- `scripts/run-tool.ps1 <tool-name> [args...]` is the PowerShell launcher.
-- Per-tool shell wrappers call `run-tool.sh` for internal adapters.
-  The packaged MCP runtime is shell-first on macOS/Linux; Windows can run
-  bundled tools through PowerShell wrappers, but stdio MCP orchestration currently
-  require a shell-compatible launcher.
+- `scripts/run-tool.ps1 <tool-name> [args...]` is the primary Windows
+  PowerShell launcher.
+- `scripts/run-unica.ps1 [args...]` is the public Windows MCP entrypoint for the
+  packaged `unica` stdio server.
+- Every `.sh` MCP/profile launcher has a matching `.ps1` launcher for Windows
+  packages. Per-tool shell and PowerShell wrappers call the common launcher for
+  internal adapters.
+  The packaged MCP runtime is shell-first on macOS/Linux and PowerShell-first on
+  Windows. Windows packages do not require WSL, Git Bash, or MSYS2 at runtime.
 
 Launcher responsibilities:
 
@@ -58,14 +62,18 @@ Launcher responsibilities:
 Runtime script inventory in `plugins/unica/scripts/` is intentionally small:
 
 - `run-tool.sh`: common macOS/Linux manifest and checksum launcher;
-- `run-tool.ps1`: common PowerShell manifest and checksum launcher;
-- `run-bsl-analyzer.sh`, `run-v8-runner.sh`, `run-rlm-tools-bsl.sh`, `run-rlm-bsl-index.sh`: direct per-tool shell entrypoints for smoke tests and manual use;
-- `run-bsl-reference.sh`, `run-bsl-workspace.sh`, `run-v8-runner-mcp.sh`: MCP profile launchers where one binary exposes several task-specific server modes.
+- `run-tool.ps1`: common Windows PowerShell manifest and checksum launcher;
+- `run-unica.sh`, `run-unica.ps1`: public target-specific MCP entrypoints for
+  the single `unica` stdio server;
+- `run-bsl-analyzer.sh`/`.ps1`, `run-v8-runner.sh`/`.ps1`,
+  `run-rlm-tools-bsl.sh`/`.ps1`, `run-rlm-bsl-index.sh`/`.ps1`: direct per-tool
+  entrypoints for smoke tests and manual use;
+- `run-bsl-reference.sh`/`.ps1`, `run-bsl-workspace.sh`/`.ps1`,
+  `run-v8-runner-mcp.sh`/`.ps1`: MCP profile launchers where one binary exposes
+  several task-specific server modes.
 
-That is nine runtime scripts: two common launchers, four direct tool wrappers,
-and three MCP profile wrappers. Dependency versions must not be copied into
-these scripts; they come from `third-party/tools.lock.json` and the generated
-manifest.
+Dependency versions must not be copied into these scripts; they come from
+`third-party/tools.lock.json` and the generated manifest.
 
 ## Release Packaging
 

@@ -80,7 +80,7 @@ scripts/dev/install-local-unica.sh --marketplace-name unica-dev
 | Operation skills and PowerShell scripts | Primary path | Available when PowerShell is installed | The source skills are Windows-first because 1C Designer automation is Windows-first. |
 | Python script ports | Available with Python | Available with `python3` | Used for XML/metadata operations where ports exist. |
 | Bundled binaries | Built by GitHub Actions into `bin/win-x64/` | Built by GitHub Actions into `bin/darwin-arm64/` | Linux x64 is built into `bin/linux-x64/`; each release artifact carries one target-specific manifest. Binaries are ignored in source control. |
-| MCP local tools | Direct PowerShell launcher is supported for packaged Windows binaries | Shell-first stdio MCP orchestrator is supported on macOS/Linux | External standards data is reached through the internal standards adapter. |
+| MCP local tools | Native PowerShell 7 (`pwsh`) launchers are the runtime path for packaged Windows binaries | Shell-first stdio MCP orchestrator is supported on macOS/Linux | Windows does not require WSL, Git Bash, or MSYS2 at runtime. External standards data is reached through the internal standards adapter. |
 | 1C platform operations | Requires local 1C platform | Requires local 1C platform or compatible tooling | Skills resolve project/database context from `v8project.yaml` when present. |
 
 ## Bundled Tools
@@ -99,10 +99,19 @@ versions in CI scripts or docs.
 Every bundled binary launch goes through a wrapper:
 
 - `scripts/run-tool.sh` for macOS/Linux shell environments;
-- `scripts/run-tool.ps1` for PowerShell environments;
-- per-tool shell wrappers used by the `unica` orchestrator as internal adapters.
+- `scripts/run-tool.ps1` as the primary Windows PowerShell launcher;
+- `scripts/run-unica.ps1` as the public Windows MCP entrypoint for the packaged
+  `unica` stdio server;
+- per-tool shell and PowerShell wrappers used by the `unica` orchestrator as
+  internal adapters.
 
 Wrappers read `third-party/manifest.json`, check the host target, verify SHA-256, and then execute the pinned binary. This prevents Codex from accidentally using a global tool of another version.
+
+Windows runtime prerequisites are Codex CLI, PowerShell 7 (`pwsh`), the local 1C
+platform for real 1C operations, and network access for remote standards lookup.
+The Windows package does not require WSL, Git Bash, or MSYS2. `rlm-tools-bsl`
+`service.json` discovery failures and remote standards endpoint failures should
+be treated as runtime configuration or network issues.
 
 ## Release Pipeline
 
@@ -162,6 +171,17 @@ plugins/unica/scripts/run-v8-runner.sh config init --help
 plugins/unica/scripts/run-rlm-tools-bsl.sh --version
 plugins/unica/scripts/run-rlm-bsl-index.sh --version
 plugins/unica/scripts/run-unica.sh --help
+```
+
+For generated `win-x64` marketplace packages, extract the archive and run from
+native PowerShell 7:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 bsl-analyzer --version
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 v8-runner config init --help
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 rlm-tools-bsl --version
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-tool.ps1 rlm-bsl-index --version
+pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps1 --help
 ```
 
 ## Updating Pinned Tools
