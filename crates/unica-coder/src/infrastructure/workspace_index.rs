@@ -711,11 +711,11 @@ mod tests {
         }
         #[cfg(not(target_os = "windows"))]
         {
-        assert_eq!(runner.commands.borrow()[0].args[0..2], ["index", "info"]);
-        assert_eq!(
-            runner.backgrounds.borrow()[0].primary.args[0..2],
-            ["index", "build"]
-        );
+            assert_eq!(runner.commands.borrow()[0].args[0..2], ["index", "info"]);
+            assert_eq!(
+                runner.backgrounds.borrow()[0].primary.args[0..2],
+                ["index", "build"]
+            );
         }
         assert_eq!(
             runner.backgrounds.borrow()[0].primary.env[0].0,
