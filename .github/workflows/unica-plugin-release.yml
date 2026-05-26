@@ -181,6 +181,9 @@ jobs:
           EVENT_REF: ${{ github.event.ref }}
           EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
+          case "${EVENT_REF:-${GITHUB_REF}}" in
+            refs/heads/*) echo "Skipping release asset upload for ${EVENT_REF:-${GITHUB_REF}}"; exit 0 ;;
+          esac
           RELEASE_TAG="$(python - <<'PY'
           import os
 
@@ -215,7 +218,14 @@ jobs:
               curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
             fi
             encoded_name="$(python -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "${name}")"
-            curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+            if ! curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"; then
+              release_json="$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+              existing_id="$(printf '%s' "${release_json}" | python -c "import json,sys; name=sys.argv[1]; print(next((str(a['id']) for a in json.load(sys.stdin).get('assets', []) if a.get('name') == name), ''))" "${name}")"
+              if [ -n "${existing_id}" ]; then
+                curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
+              fi
+              curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+            fi
           done
 
   create-release:
@@ -231,6 +241,9 @@ jobs:
           EVENT_REF: ${{ github.event.ref }}
           EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
+          case "${EVENT_REF:-${GITHUB_REF}}" in
+            refs/heads/*) echo "Skipping release creation for ${EVENT_REF:-${GITHUB_REF}}"; exit 0 ;;
+          esac
           RELEASE_TAG="$(python - <<'PY'
           import os
 
@@ -288,6 +301,9 @@ jobs:
           EVENT_REF: ${{ github.event.ref }}
           EVENT_REF_NAME: ${{ github.ref_name }}
         run: |
+          case "${EVENT_REF:-${GITHUB_REF}}" in
+            refs/heads/*) echo "Skipping installer upload for ${EVENT_REF:-${GITHUB_REF}}"; exit 0 ;;
+          esac
           RELEASE_TAG="$(python - <<'PY'
           import os
 
@@ -322,5 +338,12 @@ jobs:
               curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
             fi
             encoded_name="$(python -c "import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))" "${name}")"
-            curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+            if ! curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"; then
+              release_json="$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+              existing_id="$(printf '%s' "${release_json}" | python -c "import json,sys; name=sys.argv[1]; print(next((str(a['id']) for a in json.load(sys.stdin).get('assets', []) if a.get('name') == name), ''))" "${name}")"
+              if [ -n "${existing_id}" ]; then
+                curl -fsS -X DELETE -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/assets/${existing_id}"
+              fi
+              curl -fsS -X POST -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "Content-Type: application/octet-stream" --data-binary @"${asset}" "${upload_url}?name=${encoded_name}"
+            fi
           done
