@@ -168,15 +168,28 @@ read_plugin_version() {
   printf '%s\n' "$version"
 }
 
+read_marketplace_name() {
+  marketplace_json="$1"
+  name="$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$marketplace_json" | head -n 1)"
+  if [ -z "$name" ]; then
+    echo "Cannot read marketplace name from $marketplace_json" >&2
+    exit 65
+  fi
+  printf '%s\n' "$name"
+}
+
 enable_codex_plugin() {
   config="$CODEX_HOME_DIR/config.toml"
-  table="[plugins.\"unica@$MARKETPLACE_NAME\"]"
+  marketplace_name="$1"
+  legacy_marketplace_name="$2"
+  table="[plugins.\"unica@$marketplace_name\"]"
+  legacy_table="[plugins.\"unica@$legacy_marketplace_name\"]"
   tmp="${config}.tmp.$$"
   mkdir -p "$(dirname "$config")"
 
   if [ -f "$config" ]; then
-    awk -v table="$table" '
-      $0 == table { skip = 1; next }
+    awk -v table="$table" -v legacy_table="$legacy_table" '
+      $0 == table || $0 == legacy_table { skip = 1; next }
       skip && $0 ~ /^\[/ { skip = 0 }
       !skip { print }
     ' "$config" > "$tmp"
@@ -227,11 +240,20 @@ cp -R "$EXTRACTED_MARKETPLACE_DIR" "$MARKETPLACE_DIR"
 
 "$MARKETPLACE_DIR/plugins/unica/scripts/run-v8-runner.sh" config init --help >/dev/null
 "$MARKETPLACE_DIR/plugins/unica/scripts/run-unica.sh" --help >/dev/null
+CODEX_MARKETPLACE_NAME="$(read_marketplace_name "$MARKETPLACE_DIR/.agents/plugins/marketplace.json")"
 PLUGIN_VERSION="$(read_plugin_version "$MARKETPLACE_DIR/plugins/unica/.codex-plugin/plugin.json")"
-CODEX_PLUGIN_CACHE_DIR="$CODEX_HOME_DIR/plugins/cache/$MARKETPLACE_NAME/unica"
+CODEX_PLUGIN_CACHE_DIR="$CODEX_HOME_DIR/plugins/cache/$CODEX_MARKETPLACE_NAME/unica"
 CODEX_PLUGIN_CACHE_VERSION_DIR="$CODEX_PLUGIN_CACHE_DIR/$PLUGIN_VERSION"
+LEGACY_CODEX_PLUGIN_CACHE_DIR="$CODEX_HOME_DIR/plugins/cache/$MARKETPLACE_NAME/unica"
 
 codex plugin marketplace remove "$MARKETPLACE_NAME" >/dev/null 2>&1 || true
+if [ "$CODEX_MARKETPLACE_NAME" != "$MARKETPLACE_NAME" ]; then
+  codex plugin marketplace remove "$CODEX_MARKETPLACE_NAME" >/dev/null 2>&1 || true
+fi
+if [ "$CODEX_MARKETPLACE_NAME" != "$MARKETPLACE_NAME" ] && [ -d "$LEGACY_CODEX_PLUGIN_CACHE_DIR" ]; then
+  echo "==> Removing stale Codex plugin cache: $LEGACY_CODEX_PLUGIN_CACHE_DIR"
+  rm -rf "$LEGACY_CODEX_PLUGIN_CACHE_DIR"
+fi
 if [ -d "$CODEX_PLUGIN_CACHE_DIR" ]; then
   echo "==> Removing stale Codex plugin cache: $CODEX_PLUGIN_CACHE_DIR"
   rm -rf "$CODEX_PLUGIN_CACHE_DIR"
@@ -240,7 +262,7 @@ fi
 codex plugin marketplace add "$MARKETPLACE_DIR"
 mkdir -p "$CODEX_PLUGIN_CACHE_DIR"
 cp -R "$MARKETPLACE_DIR/plugins/unica" "$CODEX_PLUGIN_CACHE_VERSION_DIR"
-enable_codex_plugin
+enable_codex_plugin "$CODEX_MARKETPLACE_NAME" "$MARKETPLACE_NAME"
 
 if [ "$DO_VERIFY" -eq 1 ]; then
   mkdir -p "$CODEX_HOME_DIR/tmp"
@@ -256,4 +278,4 @@ if [ "$DO_VERIFY" -eq 1 ]; then
   echo "==> Fresh prompt proof: $PROMPT_PROOF"
 fi
 
-echo "==> Installed Unica $PLUGIN_VERSION in Codex as marketplace '$MARKETPLACE_NAME'"
+echo "==> Installed Unica $PLUGIN_VERSION in Codex as marketplace '$CODEX_MARKETPLACE_NAME'"

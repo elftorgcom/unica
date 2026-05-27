@@ -101,6 +101,14 @@ artifacts:
   `unica-codex-marketplace-linux-x64.tar.gz`, and
   `unica-codex-marketplace-win-x64.zip`;
 - tag builds upload the same archives plus `install-unica.sh` to the GitHub Release.
+- installers must refresh the Codex plugin cache under the canonical marketplace
+  name from `.agents/plugins/marketplace.json`; the default install folder is
+  `marketplaces/unica-local`, but Codex resolves the enabled plugin as
+  `unica@unica` and reads `plugins/cache/unica/unica/<version>/`.
+- Windows installers must rewrite installed `.mcp.json` files to use an
+  absolute `run-unica.ps1` path. Codex may launch MCP commands from an arbitrary
+  project cwd, so installed MCP launchers must not depend on `./plugins/...`
+  existing in the user's current project.
 
 ## MCP Contract
 

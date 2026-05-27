@@ -16,6 +16,11 @@ Windows-first release readiness:
   `.mcp.json` with a `pwsh -NoProfile -Command` launcher resolver instead of a
   direct bundled binary command. The resolver supports both marketplace and
   Codex plugin-cache working directories.
+- Fixed installed Windows MCP startup from arbitrary project directories by
+  rewriting `.mcp.json` to use an absolute `run-unica.ps1` path during install.
+- Fixed installer cache refresh to use the canonical marketplace name from
+  `.agents/plugins/marketplace.json` (`unica`) and remove stale user-alias cache
+  entries such as `unica-local`.
 - Documented known runtime prerequisites: Codex CLI, PowerShell 7 (`pwsh`), the
   local 1C platform for real 1C operations, and network access for remote
   standards lookup.

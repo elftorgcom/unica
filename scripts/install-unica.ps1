@@ -94,6 +94,15 @@ function Read-PluginVersion {
     return [string] $plugin.version
 }
 
+function Read-MarketplaceName {
+    param([string] $MarketplaceJson)
+    $marketplace = Get-Content -LiteralPath $MarketplaceJson -Raw | ConvertFrom-Json
+    if (-not $marketplace.name) {
+        throw "Cannot read marketplace name from $MarketplaceJson"
+    }
+    return [string] $marketplace.name
+}
+
 function Repair-WindowsMcpLauncher {
     param(
         [string] $MarketplaceDir,
@@ -112,35 +121,34 @@ function Repair-WindowsMcpLauncher {
         throw "Cannot repair Unica MCP launcher because $launcherPath is missing."
     }
 
-    $mcpCommand = @(
-        "`$ErrorActionPreference='Stop';"
-        "foreach (`$p in './plugins/unica/scripts/run-unica.ps1','./scripts/run-unica.ps1') {"
-        "if (Test-Path -LiteralPath `$p -PathType Leaf) { & `$p; exit `$LASTEXITCODE }"
-        "};"
-        "[Console]::Error.WriteLine('Unica PowerShell MCP launcher not found'); exit 127"
-    ) -join " "
+    $launcherMcpPath = (Resolve-Path -LiteralPath $launcherPath).Path
 
     $mcp = Get-Content -LiteralPath $mcpPath -Raw | ConvertFrom-Json
     $mcp.mcpServers.unica.command = "pwsh"
-    $mcp.mcpServers.unica.args = @("-NoProfile", "-Command", $mcpCommand)
+    $mcp.mcpServers.unica.args = @("-NoProfile", "-File", $launcherMcpPath)
     $mcp | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpPath -Encoding UTF8
 }
 
 function Enable-CodexPlugin {
     param(
         [string] $CodexHome,
-        [string] $MarketplaceName
+        [string] $MarketplaceName,
+        [string] $LegacyMarketplaceName
     )
     $config = Join-Path $CodexHome "config.toml"
     $configDir = Split-Path -Parent $config
     New-Item -ItemType Directory -Force -Path $configDir | Out-Null
 
+    $tablesToRemove = @("[plugins.`"unica@$MarketplaceName`"]")
+    if ($LegacyMarketplaceName -and $LegacyMarketplaceName -ne $MarketplaceName) {
+        $tablesToRemove += "[plugins.`"unica@$LegacyMarketplaceName`"]"
+    }
     $table = "[plugins.`"unica@$MarketplaceName`"]"
     $lines = @()
     if (Test-Path -LiteralPath $config) {
         $skip = $false
         foreach ($line in Get-Content -LiteralPath $config) {
-            if ($line -eq $table) {
+            if ($line -in $tablesToRemove) {
                 $skip = $true
                 continue
             }
@@ -254,11 +262,20 @@ try {
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-v8-runner.ps1") config init --help | Out-Null
     & pwsh -NoProfile -File (Join-Path $marketplaceDir "plugins\unica\scripts\run-unica.ps1") --help | Out-Null
 
+    $codexMarketplaceName = Read-MarketplaceName (Join-Path $marketplaceDir ".agents\plugins\marketplace.json")
     $pluginVersion = Read-PluginVersion (Join-Path $marketplaceDir "plugins\unica\.codex-plugin\plugin.json")
-    $pluginCacheDir = Join-Path $codexHome "plugins\cache\$marketplaceName\unica"
+    $pluginCacheDir = Join-Path $codexHome "plugins\cache\$codexMarketplaceName\unica"
     $pluginCacheVersionDir = Join-Path $pluginCacheDir $pluginVersion
+    $legacyPluginCacheDir = Join-Path $codexHome "plugins\cache\$marketplaceName\unica"
 
     & codex plugin marketplace remove $marketplaceName *> $null
+    if ($codexMarketplaceName -ne $marketplaceName) {
+        & codex plugin marketplace remove $codexMarketplaceName *> $null
+    }
+    if (($codexMarketplaceName -ne $marketplaceName) -and (Test-Path -LiteralPath $legacyPluginCacheDir)) {
+        Write-Output "==> Removing stale Codex plugin cache: $legacyPluginCacheDir"
+        Remove-Item -LiteralPath $legacyPluginCacheDir -Recurse -Force
+    }
     if (Test-Path -LiteralPath $pluginCacheDir) {
         Write-Output "==> Removing stale Codex plugin cache: $pluginCacheDir"
         Remove-Item -LiteralPath $pluginCacheDir -Recurse -Force
@@ -267,7 +284,7 @@ try {
     & codex plugin marketplace add $marketplaceDir
     New-Item -ItemType Directory -Force -Path $pluginCacheDir | Out-Null
     Copy-Item -LiteralPath (Join-Path $marketplaceDir "plugins\unica") -Destination $pluginCacheVersionDir -Recurse
-    Enable-CodexPlugin $codexHome $marketplaceName
+    Enable-CodexPlugin $codexHome $codexMarketplaceName $marketplaceName
 
     if ($doVerify) {
         $tmpDir = Join-Path $codexHome "tmp"
@@ -282,7 +299,7 @@ try {
         Write-Output "==> Fresh prompt proof: $promptProof"
     }
 
-    Write-Output "==> Installed Unica $pluginVersion in Codex as marketplace '$marketplaceName'"
+    Write-Output "==> Installed Unica $pluginVersion in Codex as marketplace '$codexMarketplaceName'"
 }
 finally {
     Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue

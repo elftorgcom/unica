@@ -56,9 +56,17 @@ class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
 
         self.assertIn("Repair-WindowsMcpLauncher $marketplaceDir $target", text)
         self.assertIn('$mcp.mcpServers.unica.command = "pwsh"', text)
-        self.assertIn("./plugins/unica/scripts/run-unica.ps1", text)
-        self.assertIn("./scripts/run-unica.ps1", text)
+        self.assertIn("$launcherMcpPath = (Resolve-Path -LiteralPath $launcherPath).Path", text)
+        self.assertIn('$mcp.mcpServers.unica.args = @("-NoProfile", "-File", $launcherMcpPath)', text)
         self.assertNotIn('$mcp.mcpServers.unica.command = "./plugins/unica/bin/win-x64/unica.exe"', text)
+
+    def test_windows_installer_uses_canonical_marketplace_name_for_cache(self) -> None:
+        text = PS_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("Read-MarketplaceName", text)
+        self.assertIn('$codexMarketplaceName = Read-MarketplaceName', text)
+        self.assertIn('plugins\\cache\\$codexMarketplaceName\\unica', text)
+        self.assertIn("Enable-CodexPlugin $codexHome $codexMarketplaceName $marketplaceName", text)
 
 
 @unittest.skipIf(os.name == "nt", "install-unica.sh URL checks run on POSIX CI")

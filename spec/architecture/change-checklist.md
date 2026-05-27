@@ -45,6 +45,8 @@ cache behavior, or packaging metadata.
 - [ ] Windows `win-x64` package `.mcp.json` uses
   `pwsh -NoProfile -Command` and resolves both `./plugins/unica/scripts/run-unica.ps1`
   and `./scripts/run-unica.ps1`.
+- [ ] Windows installer rewrites installed `.mcp.json` to an absolute
+  `run-unica.ps1` path so Codex can start MCP from any project cwd.
 - [ ] Fresh Codex visibility is checked from a clean cache when changing plugin
   metadata.
 
