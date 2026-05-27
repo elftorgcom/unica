@@ -13,8 +13,9 @@ Windows-first release readiness:
 - Updated installer and CI packaging expectations for target-specific
   marketplace artifacts, including the Windows `win-x64` package.
 - Fixed Windows package MCP startup by generating and repairing `win-x64`
-  `.mcp.json` with `pwsh -NoProfile -File ./plugins/unica/scripts/run-unica.ps1`
-  instead of a direct bundled binary command.
+  `.mcp.json` with a `pwsh -NoProfile -Command` launcher resolver instead of a
+  direct bundled binary command. The resolver supports both marketplace and
+  Codex plugin-cache working directories.
 - Documented known runtime prerequisites: Codex CLI, PowerShell 7 (`pwsh`), the
   local 1C platform for real 1C operations, and network access for remote
   standards lookup.

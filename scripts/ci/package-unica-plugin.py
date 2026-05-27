@@ -17,6 +17,13 @@ PLUGIN_ID = "unica"
 DISPLAY_NAME = "Unica"
 SOURCE_PACKAGE_IGNORES = {"bin", ".DS_Store", "__pycache__", ".pytest_cache"}
 DISALLOWED_ARCHIVE_PARTS = {".build", "dist", "__pycache__", ".pytest_cache"}
+WINDOWS_MCP_COMMAND = (
+    "$ErrorActionPreference='Stop'; "
+    "foreach ($p in './plugins/unica/scripts/run-unica.ps1','./scripts/run-unica.ps1') { "
+    "if (Test-Path -LiteralPath $p -PathType Leaf) { & $p; exit $LASTEXITCODE } "
+    "}; "
+    "[Console]::Error.WriteLine('Unica PowerShell MCP launcher not found'); exit 127"
+)
 
 
 def copytree(src: Path, dst: Path, *, ignore: set[str] | None = None) -> None:
@@ -197,7 +204,7 @@ def write_target_mcp(source_path: Path, dest_path: Path, *, target: str | None) 
     if target == "win-x64":
         server = data["mcpServers"][PLUGIN_ID]
         server["command"] = "pwsh"
-        server["args"] = ["-NoProfile", "-File", f"./plugins/{PLUGIN_ID}/scripts/run-unica.ps1"]
+        server["args"] = ["-NoProfile", "-Command", WINDOWS_MCP_COMMAND]
 
     dest_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

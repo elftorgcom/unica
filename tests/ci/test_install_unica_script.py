@@ -56,7 +56,8 @@ class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
 
         self.assertIn("Repair-WindowsMcpLauncher $marketplaceDir $target", text)
         self.assertIn('$mcp.mcpServers.unica.command = "pwsh"', text)
-        self.assertIn('"./plugins/unica/scripts/run-unica.ps1"', text)
+        self.assertIn("./plugins/unica/scripts/run-unica.ps1", text)
+        self.assertIn("./scripts/run-unica.ps1", text)
         self.assertNotIn('$mcp.mcpServers.unica.command = "./plugins/unica/bin/win-x64/unica.exe"', text)
 
 

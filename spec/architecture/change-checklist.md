@@ -43,7 +43,8 @@ cache behavior, or packaging metadata.
 - [ ] Generated `third-party/manifest.json` matches the lock.
 - [ ] `run-unica.sh --help` works from source checkout and generated package.
 - [ ] Windows `win-x64` package `.mcp.json` uses
-  `pwsh -NoProfile -File ./plugins/unica/scripts/run-unica.ps1`.
+  `pwsh -NoProfile -Command` and resolves both `./plugins/unica/scripts/run-unica.ps1`
+  and `./scripts/run-unica.ps1`.
 - [ ] Fresh Codex visibility is checked from a clean cache when changing plugin
   metadata.
 

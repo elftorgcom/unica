@@ -112,9 +112,17 @@ function Repair-WindowsMcpLauncher {
         throw "Cannot repair Unica MCP launcher because $launcherPath is missing."
     }
 
+    $mcpCommand = @(
+        "`$ErrorActionPreference='Stop';"
+        "foreach (`$p in './plugins/unica/scripts/run-unica.ps1','./scripts/run-unica.ps1') {"
+        "if (Test-Path -LiteralPath `$p -PathType Leaf) { & `$p; exit `$LASTEXITCODE }"
+        "};"
+        "[Console]::Error.WriteLine('Unica PowerShell MCP launcher not found'); exit 127"
+    ) -join " "
+
     $mcp = Get-Content -LiteralPath $mcpPath -Raw | ConvertFrom-Json
     $mcp.mcpServers.unica.command = "pwsh"
-    $mcp.mcpServers.unica.args = @("-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1")
+    $mcp.mcpServers.unica.args = @("-NoProfile", "-Command", $mcpCommand)
     $mcp | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpPath -Encoding UTF8
 }
 

@@ -36,9 +36,13 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File plugins/unica/scripts/run-unica.ps
 ```json
 {
   "command": "pwsh",
-  "args": ["-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1"]
+  "args": ["-NoProfile", "-Command", "...run-unica.ps1 resolver..."]
 }
 ```
+
+Resolver ищет `run-unica.ps1` в двух layout'ах: marketplace root
+(`./plugins/unica/scripts/run-unica.ps1`) и plugin cache root
+(`./scripts/run-unica.ps1`).
 
 Остальные инструменты (`v8-runner`, `bsl-analyzer`, `rlm-tools-bsl`,
 `rlm-bsl-index`) - внутренние adapters за границей MCP `unica`.

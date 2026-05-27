@@ -161,10 +161,10 @@ class PackageUnicaPluginTests(unittest.TestCase):
 
             server = json.loads(dest.read_text(encoding="utf-8"))["mcpServers"]["unica"]
             self.assertEqual(server["command"], "pwsh")
-            self.assertEqual(
-                server["args"],
-                ["-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1"],
-            )
+            args = " ".join(server["args"])
+            self.assertIn("-Command", server["args"])
+            self.assertIn("./plugins/unica/scripts/run-unica.ps1", args)
+            self.assertIn("./scripts/run-unica.ps1", args)
 
     def test_write_target_mcp_keeps_shell_launcher_for_posix_package(self) -> None:
         module = load_package_module()
