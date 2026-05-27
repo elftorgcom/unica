@@ -90,6 +90,10 @@ artifacts:
 - the package job writes official marketplace metadata where the marketplace
   name is `unica`, the plugin id is `unica`, and the visible display name is
   `Unica`;
+- the Windows package rewrites `.mcp.json` to launch `unica` through
+  `pwsh -NoProfile -File ./plugins/unica/scripts/run-unica.ps1`; direct
+  `bin/win-x64/unica.exe` commands are not a valid public MCP launcher because
+  startup and checksum handling belong to the PowerShell wrapper;
 - the final artifacts are platform-specific, for example
   `unica-codex-marketplace-darwin-arm64.tar.gz`,
   `unica-codex-marketplace-linux-x64.tar.gz`, and

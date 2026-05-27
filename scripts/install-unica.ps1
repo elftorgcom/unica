@@ -104,17 +104,17 @@ function Repair-WindowsMcpLauncher {
     }
 
     $mcpPath = Join-Path $MarketplaceDir "plugins\unica\.mcp.json"
-    $binaryPath = Join-Path $MarketplaceDir "plugins\unica\bin\win-x64\unica.exe"
+    $launcherPath = Join-Path $MarketplaceDir "plugins\unica\scripts\run-unica.ps1"
     if (-not (Test-Path -LiteralPath $mcpPath)) {
         throw "Cannot repair Unica MCP launcher because $mcpPath is missing."
     }
-    if (-not (Test-Path -LiteralPath $binaryPath)) {
-        throw "Cannot repair Unica MCP launcher because $binaryPath is missing."
+    if (-not (Test-Path -LiteralPath $launcherPath)) {
+        throw "Cannot repair Unica MCP launcher because $launcherPath is missing."
     }
 
     $mcp = Get-Content -LiteralPath $mcpPath -Raw | ConvertFrom-Json
-    $mcp.mcpServers.unica.command = "./plugins/unica/bin/win-x64/unica.exe"
-    $mcp.mcpServers.unica.args = @()
+    $mcp.mcpServers.unica.command = "pwsh"
+    $mcp.mcpServers.unica.args = @("-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1")
     $mcp | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpPath -Encoding UTF8
 }
 

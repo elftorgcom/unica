@@ -135,7 +135,7 @@ class PackageUnicaPluginTests(unittest.TestCase):
         )
         self.assertEqual(module.archive_base_name("0.3.3", target=None), "unica-codex-marketplace-0.3.3")
 
-    def test_write_target_mcp_uses_bundled_binary_for_windows_package(self) -> None:
+    def test_write_target_mcp_uses_powershell_launcher_for_windows_package(self) -> None:
         module = load_package_module()
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -160,8 +160,11 @@ class PackageUnicaPluginTests(unittest.TestCase):
             module.write_target_mcp(source, dest, target="win-x64")
 
             server = json.loads(dest.read_text(encoding="utf-8"))["mcpServers"]["unica"]
-            self.assertEqual(server["command"], "./plugins/unica/bin/win-x64/unica.exe")
-            self.assertEqual(server["args"], [])
+            self.assertEqual(server["command"], "pwsh")
+            self.assertEqual(
+                server["args"],
+                ["-NoProfile", "-File", "./plugins/unica/scripts/run-unica.ps1"],
+            )
 
     def test_write_target_mcp_keeps_shell_launcher_for_posix_package(self) -> None:
         module = load_package_module()
