@@ -21,6 +21,8 @@ Windows-first release readiness:
 - Fixed installer cache refresh to use the canonical marketplace name from
   `.agents/plugins/marketplace.json` (`unica`) and remove stale user-alias cache
   entries such as `unica-local`.
+- Fixed same-version Windows reinstalls while Unica MCP is already running by
+  repairing the locked existing cache launcher instead of failing on `unica.exe`.
 - Documented known runtime prerequisites: Codex CLI, PowerShell 7 (`pwsh`), the
   local 1C platform for real 1C operations, and network access for remote
   standards lookup.

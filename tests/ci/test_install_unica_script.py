@@ -58,6 +58,7 @@ class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
         self.assertIn('$mcp.mcpServers.unica.command = "pwsh"', text)
         self.assertIn("$launcherMcpPath = (Resolve-Path -LiteralPath $launcherPath).Path", text)
         self.assertIn('$mcp.mcpServers.unica.args = @("-NoProfile", "-File", $launcherMcpPath)', text)
+        self.assertIn('$mcp.mcpServers.unica.cwd = $pluginDir', text)
         self.assertNotIn('$mcp.mcpServers.unica.command = "./plugins/unica/bin/win-x64/unica.exe"', text)
 
     def test_windows_installer_uses_canonical_marketplace_name_for_cache(self) -> None:
@@ -67,6 +68,15 @@ class InstallUnicaVerificationNeedlesTests(unittest.TestCase):
         self.assertIn('$codexMarketplaceName = Read-MarketplaceName', text)
         self.assertIn('plugins\\cache\\$codexMarketplaceName\\unica', text)
         self.assertIn("Enable-CodexPlugin $codexHome $codexMarketplaceName $marketplaceName", text)
+
+    def test_windows_installer_repairs_locked_existing_cache(self) -> None:
+        text = PS_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("Remove-DirectoryIfPossible", text)
+        self.assertIn("$pluginCacheRemoved = Remove-DirectoryIfPossible $pluginCacheDir", text)
+        self.assertIn("Copy-PluginCacheFiles", text)
+        self.assertIn("Repair-WindowsMcpLauncher $pluginCacheVersionDir $target", text)
+        self.assertIn("Existing Codex plugin cache is locked", text)
 
 
 @unittest.skipIf(os.name == "nt", "install-unica.sh URL checks run on POSIX CI")

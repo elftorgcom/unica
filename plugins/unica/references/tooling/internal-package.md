@@ -109,6 +109,9 @@ artifacts:
   absolute `run-unica.ps1` path. Codex may launch MCP commands from an arbitrary
   project cwd, so installed MCP launchers must not depend on `./plugins/...`
   existing in the user's current project.
+- Windows same-version reinstalls may see a locked `unica.exe` when the plugin
+  is already active in a running Codex session. In that case, repair the existing
+  cache `.mcp.json` in place instead of treating cache removal as fatal.
 
 ## MCP Contract
 

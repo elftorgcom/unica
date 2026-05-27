@@ -112,8 +112,12 @@ function Repair-WindowsMcpLauncher {
         return
     }
 
-    $mcpPath = Join-Path $MarketplaceDir "plugins\unica\.mcp.json"
-    $launcherPath = Join-Path $MarketplaceDir "plugins\unica\scripts\run-unica.ps1"
+    $pluginDir = Join-Path $MarketplaceDir "plugins\unica"
+    if (-not (Test-Path -LiteralPath (Join-Path $pluginDir ".mcp.json"))) {
+        $pluginDir = $MarketplaceDir
+    }
+    $mcpPath = Join-Path $pluginDir ".mcp.json"
+    $launcherPath = Join-Path $pluginDir "scripts\run-unica.ps1"
     if (-not (Test-Path -LiteralPath $mcpPath)) {
         throw "Cannot repair Unica MCP launcher because $mcpPath is missing."
     }
@@ -126,7 +130,45 @@ function Repair-WindowsMcpLauncher {
     $mcp = Get-Content -LiteralPath $mcpPath -Raw | ConvertFrom-Json
     $mcp.mcpServers.unica.command = "pwsh"
     $mcp.mcpServers.unica.args = @("-NoProfile", "-File", $launcherMcpPath)
+    if ($mcp.mcpServers.unica.PSObject.Properties.Name -contains "cwd") {
+        $mcp.mcpServers.unica.cwd = $pluginDir
+    } else {
+        $mcp.mcpServers.unica | Add-Member -NotePropertyName cwd -NotePropertyValue $pluginDir
+    }
     $mcp | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $mcpPath -Encoding UTF8
+}
+
+function Remove-DirectoryIfPossible {
+    param([string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $true
+    }
+    try {
+        Remove-Item -LiteralPath $Path -Recurse -Force
+        return $true
+    }
+    catch {
+        Write-Warning "Existing Codex plugin cache is locked and could not be removed: $Path"
+        Write-Warning $_.Exception.Message
+        return $false
+    }
+}
+
+function Copy-PluginCacheFiles {
+    param(
+        [string] $SourcePluginDir,
+        [string] $DestinationPluginDir
+    )
+    New-Item -ItemType Directory -Force -Path $DestinationPluginDir | Out-Null
+    foreach ($item in Get-ChildItem -LiteralPath $SourcePluginDir -Force) {
+        try {
+            Copy-Item -LiteralPath $item.FullName -Destination $DestinationPluginDir -Recurse -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Warning "Could not refresh locked cache item: $($item.FullName)"
+            Write-Warning $_.Exception.Message
+        }
+    }
 }
 
 function Enable-CodexPlugin {
@@ -274,16 +316,22 @@ try {
     }
     if (($codexMarketplaceName -ne $marketplaceName) -and (Test-Path -LiteralPath $legacyPluginCacheDir)) {
         Write-Output "==> Removing stale Codex plugin cache: $legacyPluginCacheDir"
-        Remove-Item -LiteralPath $legacyPluginCacheDir -Recurse -Force
+        [void] (Remove-DirectoryIfPossible $legacyPluginCacheDir)
     }
+    $pluginCacheRemoved = $true
     if (Test-Path -LiteralPath $pluginCacheDir) {
         Write-Output "==> Removing stale Codex plugin cache: $pluginCacheDir"
-        Remove-Item -LiteralPath $pluginCacheDir -Recurse -Force
+        $pluginCacheRemoved = Remove-DirectoryIfPossible $pluginCacheDir
     }
 
     & codex plugin marketplace add $marketplaceDir
-    New-Item -ItemType Directory -Force -Path $pluginCacheDir | Out-Null
-    Copy-Item -LiteralPath (Join-Path $marketplaceDir "plugins\unica") -Destination $pluginCacheVersionDir -Recurse
+    if ($pluginCacheRemoved) {
+        New-Item -ItemType Directory -Force -Path $pluginCacheDir | Out-Null
+        Copy-Item -LiteralPath (Join-Path $marketplaceDir "plugins\unica") -Destination $pluginCacheVersionDir -Recurse
+    } else {
+        Copy-PluginCacheFiles (Join-Path $marketplaceDir "plugins\unica") $pluginCacheVersionDir
+        Repair-WindowsMcpLauncher $pluginCacheVersionDir $target
+    }
     Enable-CodexPlugin $codexHome $codexMarketplaceName $marketplaceName
 
     if ($doVerify) {
