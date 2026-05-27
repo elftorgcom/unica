@@ -19,7 +19,7 @@ Options:
 EOF
 }
 
-REPO="${UNICA_REPO:-IngvarConsulting/unica}"
+REPO="${UNICA_REPO:-elftorgcom/unica}"
 VERSION="${UNICA_VERSION:-latest}"
 TARGET="${UNICA_TARGET:-}"
 MARKETPLACE_NAME="${UNICA_CODEX_MARKETPLACE_NAME:-unica-local}"

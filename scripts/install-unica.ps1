@@ -151,7 +151,7 @@ function Enable-CodexPlugin {
     Set-Content -LiteralPath $config -Value $lines -Encoding UTF8
 }
 
-$repo = if ($env:UNICA_REPO) { $env:UNICA_REPO } else { "IngvarConsulting/unica" }
+$repo = if ($env:UNICA_REPO) { $env:UNICA_REPO } else { "elftorgcom/unica" }
 $version = if ($env:UNICA_VERSION) { $env:UNICA_VERSION } else { "latest" }
 $target = if ($env:UNICA_TARGET) { $env:UNICA_TARGET } else { "" }
 $marketplaceName = if ($env:UNICA_CODEX_MARKETPLACE_NAME) { $env:UNICA_CODEX_MARKETPLACE_NAME } else { "unica-local" }
